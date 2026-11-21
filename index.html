@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#050811" />
-  <title>Skaner Biomechaniki i Chodu v10.0 PRO</title>
+  <title>Skaner Biomechaniki i Chodu v10.1 PRO</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #050811; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
@@ -30,7 +30,7 @@
     <div class="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-800 shadow gap-2">
       <div class="min-w-0">
         <h1 class="text-sm sm:text-base font-bold text-white flex flex-wrap items-center gap-1.5">
-          Skaner Biomechaniki v10.0
+          Skaner Biomechaniki v10.1
           <span id="humanStatusBadge" class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">KAMERA WYŁĄCZONA</span>
         </h1>
         <p id="modelStatus" class="text-xs text-amber-400 mt-0.5 truncate">Ładowanie MediaPipe Pose + Face Privacy...</p>
@@ -136,7 +136,7 @@
       </div>
     </div>
 
-    <!-- NOWOŚĆ v10.0: LOKALNY TŁUMACZ KOMPENSACJI MIĘŚNIOWYCH -->
+    <!-- LOKALNY TŁUMACZ KOMPENSACJI MIĘŚNIOWYCH -->
     <div id="compensationSection" class="bg-slate-900 p-3.5 rounded-xl border-2 border-amber-500/35 space-y-2.5 shadow-lg">
       <div class="flex justify-between items-start gap-2 border-b border-slate-800 pb-2">
         <div>
@@ -162,7 +162,7 @@
             Podsumowanie 12 Punktów, Pięt i Rytmu Chodu
           </h2>
           <p class="text-[11px] text-slate-400">
-            Kliknij dowolny kafelek (szczególnie <strong class="text-red-400">NIE OK</strong>), aby zobaczyć zrzut błędu z czerwonym zaznaczeniem, normy oraz nagrać test potwierdzający.
+            Kliknij dowolny kafelek (szczególnie <strong class="text-red-400">NIE OK</strong>), aby zobaczyć zrzut błędu (wymaga min. 6 kolejnych klatek błędu), normy oraz nagrać test potwierdzający.
           </p>
         </div>
         <button id="resetAllBtn" class="text-[11px] text-slate-400 hover:text-red-400 underline shrink-0">Resetuj wszystko</button>
@@ -198,7 +198,7 @@
           </div>
         </div>
         <div id="inspNoSnapshotMsg" class="hidden p-3 rounded-lg bg-slate-900 text-xs text-slate-400 italic">
-          Brak zapisanego zrzutu błędu (punkt w normie lub ta płaszczyzna nie została jeszcze zeskanowana).
+          Brak zapisanego zrzutu błędu (punkt w normie, błąd trwał krócej niż 6 klatek lub ta płaszczyzna nie została jeszcze zeskanowana).
         </div>
 
         <!-- Wyjaśnienie przyczyny -->
@@ -470,6 +470,8 @@
       }
     };
 
+    const MIN_ERROR_STREAK_FRAMES = 6; // Filtr ciągłości: 6 kolejnych klatek błędu przed zrobieniem zrzutu
+
     let pointsData = {};
     function initPointsData() {
       pointsData = {};
@@ -479,6 +481,7 @@
           valueText: "Nie zeskanowano",
           normsHtml: "",
           worstScore: 0,
+          errorStreak: 0,
           snapshotUrl: null,
           verifyStatus: "NOT_DONE",
           verifyResultText: ""
@@ -486,6 +489,12 @@
       }
     }
     initPointsData();
+
+    function resetAllErrorStreaks() {
+      for (const key of Object.keys(pointsData)) {
+        pointsData[key].errorStreak = 0;
+      }
+    }
 
     // --- 4. ELEMENTY DOM ---
     const video = document.getElementById("video");
@@ -577,7 +586,7 @@
     // --- 6. ZMIENNE STANU I AKUMULATORY ---
     let poseLandmarker = null;
     let faceDetector = null;
-    let scanDirection = "FRONT"; // FRONT | SIDE | BACK
+    let scanDirection = "FRONT";
     let verifyingPointId = null;
     let verifyBuffer = { main: [], aux: [], hyperCount: 0, stepsL: [], stepsR: [] };
 
@@ -597,7 +606,6 @@
     let autoStopTimestamp = 0;
     let countdownTimer = null;
 
-    // Tracker rytmu kroków (Symetria czasu kroku L vs P)
     let stepTracker = { lastState: null, lastSwitchMs: 0 };
 
     let accum = {};
@@ -632,17 +640,14 @@
         hipTrailSamplesL: [],
         hipTrailSamplesR: [],
 
-        // Widok z tyłu (koślawienie pięt / kostek)
         rearPronationSamplesL: [],
         rearPronationSamplesR: [],
         rearPelvicTiltSum: 0,
         rearShTiltSum: 0,
 
-        // Symetria czasu kroku (ms)
         stepDurationsL: [],
         stepDurationsR: [],
 
-        // Liczniki wzorców kompensacji (Tłumacz Kompensacji)
         compLumbarGaitFrames: 0,
         compAdductorCrossoverFrames: 0,
         compQlHipHikeLeftFrames: 0,
@@ -721,7 +726,7 @@
     }
     initMediaPipe();
 
-    // --- 8. WALIDATOR ANATOMII CZŁOWIEKA (Wspiera Przód, Bok oraz Tył bez widocznego nosa!) ---
+    // --- 8. WALIDATOR ANATOMII CZŁOWIEKA ---
     function isRealHumanAnatomy(pts, w, h) {
       const Nose = pts[0], LEar = pts[7], REar = pts[8];
       const LSh = pts[11], RSh = pts[12];
@@ -848,7 +853,20 @@
       return true;
     }
 
-    // --- 10. ZRZUT BŁĘDU ---
+    // --- 10. ZRZUT BŁĘDU Z FILTREM CIĄGŁOŚCI 6 KLATEK ---
+    function trackPointErrorForSnapshot(pointId, isError, severityScore, pts, redSegments, redJoints, bannerText, valueStr) {
+      const pData = pointsData[pointId];
+      if (!pData) return;
+      if (!isError) {
+        pData.errorStreak = 0;
+        return;
+      }
+      pData.errorStreak++;
+      if (pData.errorStreak >= MIN_ERROR_STREAK_FRAMES) {
+        capturePointErrorSnapshot(pointId, severityScore, pts, redSegments, redJoints, bannerText, valueStr);
+      }
+    }
+
     function capturePointErrorSnapshot(pointId, severityScore, pts, redSegments, redJoints, bannerText, valueStr) {
       const pData = pointsData[pointId];
       if (!pData || severityScore <= pData.worstScore) return;
@@ -879,7 +897,7 @@
         }
       }
 
-      drawPoseHeadShield(sCtx, pts);
+      if (scanDirection !== "BACK") drawPoseHeadShield(sCtx, pts);
 
       sCtx.strokeStyle = "#ef4444";
       sCtx.lineWidth = 6.5;
@@ -921,6 +939,7 @@
       isCountingDown = false;
       autoStopTimestamp = 0;
       consecutiveHumanFrames = 0;
+      resetAllErrorStreaks();
       stepTracker = { lastState: null, lastSwitchMs: 0 };
       countdownOverlay.classList.add("hidden");
 
@@ -957,6 +976,7 @@
       video.pause();
       isCameraRunning = false;
       consecutiveHumanFrames = 0;
+      resetAllErrorStreaks();
       stepTracker = { lastState: null, lastSwitchMs: 0 };
 
       if ("wakeLock" in navigator) { try { await navigator.wakeLock.request("screen"); } catch (_) {} }
@@ -1024,6 +1044,7 @@
           countdownOverlay.classList.add("hidden");
           isCountingDown = false;
           resetFilters();
+          resetAllErrorStreaks();
           stepTracker = { lastState: null, lastSwitchMs: 0 };
           if (verifyingPointId) verifyBuffer = { main: [], aux: [], hyperCount: 0, stepsL: [], stepsR: [] };
           autoStopTimestamp = Date.now() + 15000;
@@ -1038,6 +1059,7 @@
       if (currentStream) { currentStream.getTracks().forEach(t => t.stop()); currentStream = null; }
       isLiveStream = false;
       consecutiveHumanFrames = 0;
+      resetAllErrorStreaks();
       stepTracker = { lastState: null, lastSwitchMs: 0 };
       video.srcObject = null;
       video.src = URL.createObjectURL(file);
@@ -1071,6 +1093,7 @@
       scanDirection = dir;
       verifyingPointId = null;
       verifyModeBadge.classList.add("hidden");
+      resetAllErrorStreaks();
 
       const act = "py-2 px-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition";
       const inact = "py-2 px-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 transition";
@@ -1165,23 +1188,18 @@
       return { rawInternal, effectiveDeg, isHyperExtended };
     }
 
-    // Ocena koślawienia pięty/kostki w widoku z tyłu (medjalne przesunięcie kostki względem osi kolano-pięta)
     function computeRearHeelPronationDeg(knee, ankle, heel, pelvisCenterX) {
       const lowerLegLen = Math.hypot(knee.x - heel.x, knee.y - heel.y);
       if (lowerLegLen < 35) return 0;
       const ankToHeelDist = Math.hypot(ankle.x - heel.x, ankle.y - heel.y);
-      // Jeśli pięta jest wyraźnie widoczna pod kostką, mierzymy ucieczkę kostki do środka osi ciała
       const t = Math.max(0.1, Math.min(0.95, (ankle.y - knee.y) / ((heel.y - knee.y) || 1)));
       const lineX = knee.x + t * (heel.x - knee.x);
       const ankToCenter = Math.abs(ankle.x - pelvisCenterX);
       const lineToCenter = Math.abs(lineX - pelvisCenterX);
-      // Dodatnia wartość = kostka zapada się do środka (pronacja/koślawienie pięty)
       const medialCollapsePx = lineToCenter - ankToCenter;
-      const calcanealRatioDeg = (Math.atan2(medialCollapsePx, Math.max(12, ankToHeelDist * 1.8)) * 180) / Math.PI;
-      return calcanealRatioDeg;
+      return (Math.atan2(medialCollapsePx, Math.max(12, ankToHeelDist * 1.8)) * 180) / Math.PI;
     }
 
-    // Pomiar czasu trwania kroku lewego i prawego (ms)
     function trackStepTiming(currentState, nowMs, targetL, targetR) {
       if (!currentState) return;
       if (stepTracker.lastState && stepTracker.lastState !== currentState) {
@@ -1258,6 +1276,7 @@
       if (!pts) {
         applyFacePrivacyNow();
         consecutiveHumanFrames = 0;
+        resetAllErrorStreaks();
         stepTracker.lastState = null;
         humanStatusBadge.textContent = faceDetections.length ? "TWARZ ZAMAZANA (COFNIJ SIĘ)" : "BRAK SYLWETKI";
         humanStatusBadge.className = "text-[10px] bg-amber-950 text-amber-400 px-2 py-0.5 rounded border border-amber-800";
@@ -1272,6 +1291,7 @@
       if (!humanCheck.valid) {
         applyFacePrivacyNow();
         consecutiveHumanFrames = 0;
+        resetAllErrorStreaks();
         stepTracker.lastState = null;
         humanStatusBadge.textContent = "NIEPEŁNA SYLWETKA";
         humanStatusBadge.className = "text-[10px] bg-amber-950 text-amber-400 px-2 py-0.5 rounded border border-amber-800";
@@ -1309,7 +1329,7 @@
       else processStandardScanFrame(pts, w, h, nowMs);
     }
 
-    // --- 14. SKAN GŁÓWNY (PRZÓD / BOK / TYŁ + KOMPENSACJE + RYTM KROKU) ---
+    // --- 14. SKAN GŁÓWNY (PRZÓD / BOK / TYŁ + FILTR 6 KLATEK DLA ZDJĘĆ) ---
     function processStandardScanFrame(pts, w, h, nowMs) {
       const Nose = pts[0], LEar = pts[7], REar = pts[8];
       const LSh = pts[11], RSh = pts[12], LHip = pts[23], RHip = pts[24];
@@ -1327,7 +1347,6 @@
       if (scanDirection === "FRONT") {
         accum.frontFrames++;
 
-        // Wykrywanie kroków i rytmu z przodu
         const ankDiffY = LAnk.y - RAnk.y;
         const stepThreshY = bodyHeightPx * 0.018;
         const isSteppingFront = Math.abs(ankDiffY) > stepThreshY;
@@ -1335,7 +1354,6 @@
           accum.frontBackStepFrames++;
           trackStepTiming(ankDiffY > 0 ? "L" : "R", nowMs, accum.stepDurationsL, accum.stepDurationsR);
 
-          // Wykrywanie podciągania biodra (QL Hip Hike): uniesiona stopa + biodro po tej stronie wyżej niż podporowe
           const liftedIsRight = ankDiffY > 0;
           const liftedHip = liftedIsRight ? RHip : LHip;
           const stanceHip = liftedIsRight ? LHip : RHip;
@@ -1348,35 +1366,31 @@
 
         const headTilt = horizontalTiltDeg(LEar, REar);
         accum.headTiltSum += headTilt;
-        if (headTilt >= 3.8) {
-          currentWarnings.push(`Przekrzywiona głowa (${headTilt.toFixed(1)}°)`);
-          capturePointErrorSnapshot("P1_HEAD_TILT", headTilt, pts, [[LEar, REar]], [LEar, REar], "Głowa pochylona w bok", `${headTilt.toFixed(1)}°`);
-        }
+        const headErr = headTilt >= 3.8;
+        if (headErr) currentWarnings.push(`Przekrzywiona głowa (${headTilt.toFixed(1)}°)`);
+        trackPointErrorForSnapshot("P1_HEAD_TILT", headErr, headTilt, pts, [[LEar, REar]], [LEar, REar], "Głowa pochylona w bok", `${headTilt.toFixed(1)}°`);
 
         const shTilt = horizontalTiltDeg(LSh, RSh);
         const lowerSh = LSh.y > RSh.y ? "Lewy niżej" : "Prawy niżej";
         accum.shTiltSum += shTilt;
         accum.shLowerSide = lowerSh;
-        if (shTilt >= 3.0) {
-          currentWarnings.push(`Nierówne barki (${lowerSh}: ${shTilt.toFixed(1)}°)`);
-          capturePointErrorSnapshot("P2_SHOULDERS", shTilt, pts, [[LSh, RSh]], [LSh, RSh], `Asymetria barków (${lowerSh})`, `${shTilt.toFixed(1)}°`);
-        }
+        const shErr = shTilt >= 3.0;
+        if (shErr) currentWarnings.push(`Nierówne barki (${lowerSh}: ${shTilt.toFixed(1)}°)`);
+        trackPointErrorForSnapshot("P2_SHOULDERS", shErr, shTilt, pts, [[LSh, RSh]], [LSh, RSh], `Asymetria barków (${lowerSh})`, `${shTilt.toFixed(1)}°`);
 
         const trunkShiftPct = (Math.abs(midSh.x - midHip.x) / torsoLen) * 100;
         accum.trunkShiftSum += trunkShiftPct;
-        if (trunkShiftPct >= 3.2) {
-          currentWarnings.push(`Boczny shift tułowia (${trunkShiftPct.toFixed(1)}%)`);
-          capturePointErrorSnapshot("P3_TRUNK_SHIFT", trunkShiftPct, pts, [[midSh, midHip]], [midSh, midHip], "Ucieczka klatki względem miednicy", `${trunkShiftPct.toFixed(1)}%`);
-        }
+        const shiftErr = trunkShiftPct >= 3.2;
+        if (shiftErr) currentWarnings.push(`Boczny shift tułowia (${trunkShiftPct.toFixed(1)}%)`);
+        trackPointErrorForSnapshot("P3_TRUNK_SHIFT", shiftErr, trunkShiftPct, pts, [[midSh, midHip]], [midSh, midHip], "Ucieczka klatki względem miednicy", `${trunkShiftPct.toFixed(1)}%`);
 
         const pelvicTilt = horizontalTiltDeg(LHip, RHip);
         accum.pelvicTiltSum += pelvicTilt;
         accum.pelvicSamplesCount++;
-        if (pelvicTilt >= 3.4) {
-          const dropSide = LHip.y > RHip.y ? "Lewe biodro opada" : "Prawe biodro opada";
-          currentWarnings.push(`${dropSide} (${pelvicTilt.toFixed(1)}°)`);
-          capturePointErrorSnapshot("P4_PELVIS_FRONT", pelvicTilt, pts, [[LHip, RHip]], [LHip, RHip], dropSide, `${pelvicTilt.toFixed(1)}°`);
-        }
+        const pelvErr = pelvicTilt >= 3.4;
+        const dropSide = LHip.y > RHip.y ? "Lewe biodro opada" : "Prawe biodro opada";
+        if (pelvErr) currentWarnings.push(`${dropSide} (${pelvicTilt.toFixed(1)}°)`);
+        trackPointErrorForSnapshot("P4_PELVIS_FRONT", pelvErr, pelvicTilt, pts, [[LHip, RHip]], [LHip, RHip], dropSide, `${pelvicTilt.toFixed(1)}°`);
 
         const lVal = kneeValgusDeg(LHip, LKnee, LAnk, midHip.x);
         const rVal = kneeValgusDeg(RHip, RKnee, RAnk, midHip.x);
@@ -1384,13 +1398,11 @@
         const worseKnee = Math.abs(lVal) >= Math.abs(rVal) ? "Lewe kolano" : "Prawe kolano";
         accum.kneeValgusMaxSum += maxAbsVal;
         accum.worseKneeSide = worseKnee;
-        if (maxAbsVal >= 6.8) {
-          currentWarnings.push(`Ucieczka osi kolana (${worseKnee}: ${maxAbsVal.toFixed(1)}°)`);
-          const badSegs = Math.abs(lVal) >= Math.abs(rVal) ? [[LHip, LKnee], [LKnee, LAnk]] : [[RHip, RKnee], [RKnee, RAnk]];
-          capturePointErrorSnapshot("P5_KNEES_FRONT", maxAbsVal, pts, badSegs, [Math.abs(lVal) >= Math.abs(rVal) ? LKnee : RKnee], `Koślawość (${worseKnee})`, `${maxAbsVal.toFixed(1)}°`);
-        }
+        const kneeFrontErr = maxAbsVal >= 6.8;
+        if (kneeFrontErr) currentWarnings.push(`Ucieczka osi kolana (${worseKnee}: ${maxAbsVal.toFixed(1)}°)`);
+        const badSegs = Math.abs(lVal) >= Math.abs(rVal) ? [[LHip, LKnee], [LKnee, LAnk]] : [[RHip, RKnee], [RKnee, RAnk]];
+        trackPointErrorForSnapshot("P5_KNEES_FRONT", kneeFrontErr, maxAbsVal, pts, badSegs, [Math.abs(lVal) >= Math.abs(rVal) ? LKnee : RKnee], `Koślawość (${worseKnee})`, `${maxAbsVal.toFixed(1)}°`);
 
-        // Wykrywanie dominacji przywodzicieli / crossover gait (zwężony rozstaw kostek + koślawość do środka)
         const ankleSpan = Math.abs(LAnk.x - RAnk.x);
         if (ankleSpan < hipWidth * 0.48 && (lVal > 5.5 || rVal > 5.5)) {
           accum.compAdductorCrossoverFrames++;
@@ -1401,9 +1413,7 @@
         const rFootOut = ((Math.abs(RFoot.x - midHip.x) - Math.abs(RAnk.x - midHip.x)) / legLen) * 100;
         const footDiff = Math.abs(lFootOut - rFootOut);
         accum.footAsymSum += footDiff;
-        if (footDiff >= 3.6) {
-          capturePointErrorSnapshot("P6_FEET_ANKLES", footDiff, pts, [[LAnk, LFoot], [RAnk, RFoot]], [LAnk, RAnk], "Asymetria rotacji stóp", `${footDiff.toFixed(1)}%`);
-        }
+        trackPointErrorForSnapshot("P6_FEET_ANKLES", footDiff >= 3.6, footDiff, pts, [[LAnk, LFoot], [RAnk, RFoot]], [LAnk, RAnk], "Asymetria rotacji stóp", `${footDiff.toFixed(1)}%`);
 
       } else if (scanDirection === "SIDE") {
         accum.sideFrames++;
@@ -1422,7 +1432,6 @@
 
         if (isStepping) {
           accum.sideStepFrames++;
-          // Śledzenie rytmu kroków z boku (L z przodu vs P z przodu)
           if (Math.abs(stepSpreadPx) > bodyHeightPx * 0.085) {
             trackStepTiming(stepSpreadPx > 0 ? "L" : "R", nowMs, accum.stepDurationsL, accum.stepDurationsR);
           }
@@ -1432,10 +1441,9 @@
 
         const headForwardDeg = Math.max(0, (Math.atan2((Ear.x - Sh.x) * facingSign, Math.max(1, Math.abs(Sh.y - Ear.y))) * 180) / Math.PI);
         accum.headForwardSum += headForwardDeg;
-        if (headForwardDeg >= 14.0) {
-          currentWarnings.push(`Wystająca głowa (${headForwardDeg.toFixed(1)}°)`);
-          capturePointErrorSnapshot("P7_HEAD_FORWARD", headForwardDeg, pts, [[Sh, Ear]], [Ear, Sh], "Protrakcja głowy przed barki", `${headForwardDeg.toFixed(1)}°`);
-        }
+        const headFwdErr = headForwardDeg >= 14.0;
+        if (headFwdErr) currentWarnings.push(`Wystająca głowa (${headForwardDeg.toFixed(1)}°)`);
+        trackPointErrorForSnapshot("P7_HEAD_FORWARD", headFwdErr, headForwardDeg, pts, [[Sh, Ear]], [Ear, Sh], "Protrakcja głowy przed barki", `${headForwardDeg.toFixed(1)}°`);
 
         const stanceAnk = LAnk.y >= RAnk.y ? LAnk : RAnk;
         const tHip = (Hip.y - Sh.y) / ((stanceAnk.y - Sh.y) || 1);
@@ -1443,10 +1451,11 @@
         const aptShiftPct = Math.max(0, (((Hip.x - plumbXAtHip) * facingSign) / bodyHeightPx) * 100);
         if (!isStepping) {
           accum.aptShiftSamples.push(aptShiftPct);
-          if (aptShiftPct >= 3.8) {
-            currentWarnings.push(`Wypchnięcie miednicy APT (${aptShiftPct.toFixed(1)}%)`);
-            capturePointErrorSnapshot("P8_PELVIS_APT", aptShiftPct, pts, [[Sh, Hip], [Hip, Knee]], [Hip], "Wypchnięcie miednicy (APT)", `${aptShiftPct.toFixed(1)}%`);
-          }
+          const aptErr = aptShiftPct >= 3.8;
+          if (aptErr) currentWarnings.push(`Wypchnięcie miednicy APT (${aptShiftPct.toFixed(1)}%)`);
+          trackPointErrorForSnapshot("P8_PELVIS_APT", aptErr, aptShiftPct, pts, [[Sh, Hip], [Hip, Knee]], [Hip], "Wypchnięcie miednicy (APT)", `${aptShiftPct.toFixed(1)}%`);
+        } else {
+          pointsData.P8_PELVIS_APT.errorStreak = 0;
         }
 
         const lKneeData = computeSagittalKneeAngle(LHip, LKnee, LAnk, facingSign);
@@ -1458,18 +1467,12 @@
         if (LKnee.v > 0.58 && LAnk.v > 0.55) {
           if (isLeftStance) accum.kneeExtSamplesL.push(lKneeData.rawInternal);
           if (isStepping) accum.kneeSwingSamplesL.push(lKneeData.rawInternal);
-          if (lKneeData.effectiveDeg > 184.2) {
-            accum.hyperExtSamplesL.push(lKneeData.effectiveDeg);
-            capturePointErrorSnapshot("P9_KNEE_EXTENSION", lKneeData.effectiveDeg - 180, pts, [[LHip, LKnee], [LKnee, LAnk]], [LKnee], "Przeprost lewego kolana", `${lKneeData.effectiveDeg.toFixed(1)}°`);
-          }
+          if (lKneeData.effectiveDeg > 184.2) accum.hyperExtSamplesL.push(lKneeData.effectiveDeg);
         }
         if (RKnee.v > 0.58 && RAnk.v > 0.55) {
           if (isRightStance) accum.kneeExtSamplesR.push(rKneeData.rawInternal);
           if (isStepping) accum.kneeSwingSamplesR.push(rKneeData.rawInternal);
-          if (rKneeData.effectiveDeg > 184.2) {
-            accum.hyperExtSamplesR.push(rKneeData.effectiveDeg);
-            capturePointErrorSnapshot("P9_KNEE_EXTENSION", rKneeData.effectiveDeg - 180, pts, [[RHip, RKnee], [RKnee, RAnk]], [RKnee], "Przeprost prawego kolana", `${rKneeData.effectiveDeg.toFixed(1)}°`);
-          }
+          if (rKneeData.effectiveDeg > 184.2) accum.hyperExtSamplesR.push(rKneeData.effectiveDeg);
         }
 
         const primaryIsLeft = LAnk.y >= RAnk.y;
@@ -1479,13 +1482,21 @@
         const stanceAnkPt = primaryIsLeft ? LAnk : RAnk;
         const stanceName = primaryIsLeft ? "Lewe kolano" : "Prawe kolano";
 
-        if (stanceKneeData.rawInternal < 172.0 && stanceKneeData.rawInternal > 135.0) {
+        const isHyper = stanceKneeData.effectiveDeg > 184.2;
+        const isUnderExt = stanceKneeData.rawInternal < 172.0 && stanceKneeData.rawInternal > 135.0;
+
+        if (isHyper) {
+          currentWarnings.push(`Przeprost (${stanceName}: ${stanceKneeData.effectiveDeg.toFixed(1)}°)`);
+          trackPointErrorForSnapshot("P9_KNEE_EXTENSION", true, stanceKneeData.effectiveDeg - 180, pts, [[stanceHip, stanceKnee], [stanceKnee, stanceAnkPt]], [stanceKnee], `Przeprost (${stanceName})`, `${stanceKneeData.effectiveDeg.toFixed(1)}°`);
+          pointsData.P10_GAIT_NORMS.errorStreak = 0;
+        } else if (isUnderExt) {
           const deficit = 180 - stanceKneeData.rawInternal;
           currentWarnings.push(`Niedowyprost (${stanceName}: ${stanceKneeData.rawInternal.toFixed(0)}°)`);
-          capturePointErrorSnapshot("P9_KNEE_EXTENSION", deficit, pts, [[stanceHip, stanceKnee], [stanceKnee, stanceAnkPt]], [stanceKnee], `Brak pełnego wyprostu (${stanceName})`, `Kąt: ${stanceKneeData.rawInternal.toFixed(1)}° (Norma ≥173°)`);
-          if (isStepping) {
-            capturePointErrorSnapshot("P10_GAIT_NORMS", deficit, pts, [[stanceHip, stanceKnee], [stanceKnee, stanceAnkPt]], [stanceKnee], `Chód na ugiętym kolanie (${stanceName})`, `Podpór: ${stanceKneeData.rawInternal.toFixed(1)}°`);
-          }
+          trackPointErrorForSnapshot("P9_KNEE_EXTENSION", true, deficit, pts, [[stanceHip, stanceKnee], [stanceKnee, stanceAnkPt]], [stanceKnee], `Brak pełnego wyprostu (${stanceName})`, `Kąt: ${stanceKneeData.rawInternal.toFixed(1)}° (Norma ≥173°)`);
+          trackPointErrorForSnapshot("P10_GAIT_NORMS", isStepping, deficit, pts, [[stanceHip, stanceKnee], [stanceKnee, stanceAnkPt]], [stanceKnee], `Chód na ugiętym kolanie (${stanceName})`, `Podpór: ${stanceKneeData.rawInternal.toFixed(1)}°`);
+        } else {
+          pointsData.P9_KNEE_EXTENSION.errorStreak = 0;
+          pointsData.P10_GAIT_NORMS.errorStreak = 0;
         }
 
         if (isStepping) {
@@ -1494,7 +1505,6 @@
           accum.hipTrailSamplesL.push(lTrail);
           accum.hipTrailSamplesR.push(rTrail);
 
-          // KOMPENSACJA: Lędźwia zamiast pośladka (brak zakroku < 9° przy odchyleniu tułowia w tył lub wypchnięciu bioder)
           const activeTrail = Math.max(lTrail, rTrail);
           const trunkBackLeanDeg = (Math.atan2((Hip.x - Sh.x) * facingSign, Math.max(1, Math.abs(Hip.y - Sh.y))) * 180) / Math.PI;
           if (stepSpreadPct > 15 && activeTrail < 9.5 && (trunkBackLeanDeg > 3.2 || aptShiftPct > 4.2)) {
@@ -1517,7 +1527,6 @@
         `;
 
       } else if (scanDirection === "BACK") {
-        // --- SKAN 3: WIDOK Z TYŁU (Pięty/Kostki, Opadanie Miednicy, QL Hip Hike, Rytm) ---
         accum.backFrames++;
 
         const ankDiffY = LAnk.y - RAnk.y;
@@ -1536,21 +1545,18 @@
           }
         }
 
-        // Poziom miednicy i barków od tyłu (bez zasłaniania przez klatkę/brzuch)
         const rearPelvicTilt = horizontalTiltDeg(LHip, RHip);
         accum.rearPelvicTiltSum += rearPelvicTilt;
         accum.pelvicTiltSum += rearPelvicTilt;
         accum.pelvicSamplesCount++;
-        if (rearPelvicTilt >= 3.4) {
-          const dropSide = LHip.y > RHip.y ? "Lewe biodro opada (widok z tyłu)" : "Prawe biodro opada (widok z tyłu)";
-          currentWarnings.push(`${dropSide}: ${rearPelvicTilt.toFixed(1)}°`);
-          capturePointErrorSnapshot("P4_PELVIS_FRONT", rearPelvicTilt, pts, [[LHip, RHip]], [LHip, RHip], dropSide, `${rearPelvicTilt.toFixed(1)}°`);
-        }
+        const rearPelvErr = rearPelvicTilt >= 3.4;
+        const dropSide = LHip.y > RHip.y ? "Lewe biodro opada (widok z tyłu)" : "Prawe biodro opada (widok z tyłu)";
+        if (rearPelvErr) currentWarnings.push(`${dropSide}: ${rearPelvicTilt.toFixed(1)}°`);
+        trackPointErrorForSnapshot("P4_PELVIS_FRONT", rearPelvErr, rearPelvicTilt, pts, [[LHip, RHip]], [LHip, RHip], dropSide, `${rearPelvicTilt.toFixed(1)}°`);
 
         const rearShTilt = horizontalTiltDeg(LSh, RSh);
         accum.rearShTiltSum += rearShTilt;
 
-        // Koślawienie pięt i kostek (Punkt 11)
         const pronL = (LAnk.v > 0.55 && LHeel.v > 0.5) ? computeRearHeelPronationDeg(LKnee, LAnk, LHeel, midHip.x) : 0;
         const pronR = (RAnk.v > 0.55 && RHeel.v > 0.5) ? computeRearHeelPronationDeg(RKnee, RAnk, RHeel, midHip.x) : 0;
         if (LHeel.v > 0.5) accum.rearPronationSamplesL.push(pronL);
@@ -1558,16 +1564,15 @@
 
         const maxPron = Math.max(pronL, pronR);
         const worseFoot = pronL >= pronR ? "Lewa kostka/pięta" : "Prawa kostka/pięta";
-        const pronOk = maxPron < 6.5;
+        const pronErr = maxPron >= 6.5;
 
-        if (!pronOk) {
+        if (pronErr) {
           accum.compRearPronationFrames++;
           currentWarnings.push(`Koślawienie pięty (${worseFoot}: ${maxPron.toFixed(1)}°)`);
-          const badSegs = pronL >= pronR ? [[LKnee, LAnk], [LAnk, LHeel]] : [[RKnee, RAnk], [RAnk, RHeel]];
-          capturePointErrorSnapshot("P11_REAR_HEELS_BACK", maxPron, pts, badSegs, [pronL >= pronR ? LAnk : RAnk], `Zapadanie kostki do środka (${worseFoot})`, `${maxPron.toFixed(1)}°`);
         }
+        const badSegs = pronL >= pronR ? [[LKnee, LAnk], [LAnk, LHeel]] : [[RKnee, RAnk], [RAnk, RHeel]];
+        trackPointErrorForSnapshot("P11_REAR_HEELS_BACK", pronErr, maxPron, pts, badSegs, [pronL >= pronR ? LAnk : RAnk], `Zapadanie kostki do środka (${worseFoot})`, `${maxPron.toFixed(1)}°`);
 
-        // Rysuj osie łydek i pięt na żywo
         ctx.save();
         ctx.lineWidth = 3.5;
         ctx.strokeStyle = pronL < 6.5 ? "#10b981" : "#ef4444";
@@ -1595,7 +1600,6 @@
 
     // --- 15. FINALIZACJA 12 PUNKTÓW ORAZ TŁUMACZ KOMPENSACJI ---
     function finalizeScanSummary() {
-      // Punkty 1–6 (Przód)
       if (accum.frontFrames > 8) {
         const N = accum.frontFrames;
         const avgHead = accum.headTiltSum / N;
@@ -1619,14 +1623,12 @@
         pointsData.P6_FEET_ANKLES.valueText = `Asymetria L/P: ${avgFoot.toFixed(1)}%`;
       }
 
-      // Punkt 4 (Miednica czołowa - zbierana zarówno z Przodu jak i z Tyłu!)
       if (accum.pelvicSamplesCount > 8) {
         const avgPelv = accum.pelvicTiltSum / accum.pelvicSamplesCount;
         pointsData.P4_PELVIS_FRONT.status = avgPelv >= 3.2 ? "PROBLEM" : "OK";
         pointsData.P4_PELVIS_FRONT.valueText = `Śr. ${avgPelv.toFixed(1)}° (${POINTS_SPEC.P4_PELVIS_FRONT.normText})`;
       }
 
-      // Punkty 7–10 (Bok)
       let extL = 0, extR = 0, lFullOk = true, rFullOk = true, hasHyperL = false, hasHyperR = false;
       if (accum.sideFrames > 8) {
         const N = accum.sideFrames;
@@ -1707,7 +1709,6 @@
         }
       }
 
-      // Punkt 11: Koślawienie pięt i kostek (Tył)
       if (accum.backFrames > 8) {
         const p85L = getPercentile(accum.rearPronationSamplesL, 0.85);
         const p85R = getPercentile(accum.rearPronationSamplesR, 0.85);
@@ -1726,7 +1727,6 @@
         `;
       }
 
-      // Punkt 12: Symetria czasu kroku (Rytm L vs P)
       let stepAsymPct = 0;
       let hasStepSymmetryData = accum.stepDurationsL.length >= 2 && accum.stepDurationsR.length >= 2;
       if (hasStepSymmetryData) {
@@ -1757,7 +1757,6 @@
         pointsData.P12_STEP_SYMMETRY.valueText = `Zbyt mało kroków (L:${accum.stepDurationsL.length}, P:${accum.stepDurationsR.length}) – zrób min. 4 kroki w marszu`;
       }
 
-      // --- BUDOWANIE WNIOSKÓW TŁUMACZA KOMPENSACJI ---
       detectedCompensations = [];
 
       if (accum.sideStepFrames >= 6 && accum.compLumbarGaitFrames >= 4) {
@@ -1866,7 +1865,7 @@
       }).join("");
     }
 
-    // --- 16. TESTY WERYFIKACYJNE (WSZYSTKIE 12 PUNKTÓW) ---
+    // --- 16. TESTY WERYFIKACYJNE ---
     function processVerificationExerciseFrame(pointId, pts, w, h, nowMs) {
       const Nose = pts[0], LEar = pts[7], REar = pts[8];
       const LSh = pts[11], RSh = pts[12], LElb = pts[13], RElb = pts[14];
@@ -2123,7 +2122,7 @@
 
     // --- 18. RAPORT, PDF I GEMINI AI ---
     function buildFullTextReport() {
-      const lines = ["=== RAPORT BIOMECHANICZNY v10.0 (12 PUNKTÓW + TŁUMACZ KOMPENSACJI) ==="];
+      const lines = ["=== RAPORT BIOMECHANICZNY v10.1 (12 PUNKTÓW + TŁUMACZ KOMPENSACJI) ==="];
       if (detectedCompensations.length > 0) {
         lines.push("--- WYKRYTE WZORCE KOMPENSACJI ---");
         for (const c of detectedCompensations) {
@@ -2170,7 +2169,7 @@
       }).join("");
 
       printReportView.innerHTML = `
-        <h1 style="font-size:18px;font-weight:800;margin-bottom:4px;">Raport Biomechaniczny Postawy i Chodu v10.0</h1>
+        <h1 style="font-size:18px;font-weight:800;margin-bottom:4px;">Raport Biomechaniczny Postawy i Chodu v10.1</h1>
         <p style="font-size:11px;color:#475569;margin-bottom:12px;">Wygenerowano: ${new Date().toLocaleString("pl-PL")} | Twarze na zdjęciach zostały trwale zamazane.</p>
         ${compHtml ? `<h2 style="font-size:14px;font-weight:700;margin:8px 0;">Wykryte wzorce kompensacji</h2>${compHtml}` : ""}
         <h2 style="font-size:14px;font-weight:700;margin:8px 0;">Szczegóły 12 punktów</h2>
