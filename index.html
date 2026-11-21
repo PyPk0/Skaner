@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#050811" />
-  <title>Skaner Biomechaniki i Chodu v9.1</title>
+  <title>Skaner Biomechaniki i Chodu v10.0 PRO</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #050811; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
@@ -30,7 +30,7 @@
     <div class="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-800 shadow gap-2">
       <div class="min-w-0">
         <h1 class="text-sm sm:text-base font-bold text-white flex flex-wrap items-center gap-1.5">
-          Skaner Biomechaniki v9.1
+          Skaner Biomechaniki v10.0
           <span id="humanStatusBadge" class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">KAMERA WYŁĄCZONA</span>
         </h1>
         <p id="modelStatus" class="text-xs text-amber-400 mt-0.5 truncate">Ładowanie MediaPipe Pose + Face Privacy...</p>
@@ -55,7 +55,7 @@
         <span id="apiKeySavedStatus" class="text-[11px] text-amber-400">Brak klucza</span>
       </div>
       <p class="text-[11px] text-slate-400 leading-relaxed">
-        Klucz z <code>aistudio.google.com</code> zapisywany jest wyłącznie lokalnie (<code>localStorage</code>). Wysyła raport 10 punktów oraz zdjęcia błędów (z zamazaną twarzą) bezpośrednio do <code>gemini-2.5-flash</code>.
+        Klucz z <code>aistudio.google.com</code> zapisywany jest wyłącznie lokalnie (<code>localStorage</code>). Wysyła raport 12 punktów, wzorce kompensacji oraz zdjęcia błędów (z zamazaną twarzą) dopiero po kliknięciu przycisku analizy AI.
       </p>
       <div class="flex gap-2">
         <input id="apiKeyInput" type="password" placeholder="Wklej klucz AIzaSy..." class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white" />
@@ -64,22 +64,31 @@
       </div>
     </div>
 
-    <!-- Wybór płaszczyzny skanu -->
-    <div class="grid grid-cols-2 gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
-      <button id="modeFrontBtn" class="py-2.5 px-2 rounded-lg text-xs font-bold bg-blue-600 text-white transition">
-        1. SKAN Z PRZODU<br>
-        <span class="font-normal text-[10px] opacity-85">Pkt 1–6: Głowa, Barki, Tułów, Miednica, Oś Kolan, Stopy</span>
-      </button>
-      <button id="modeSideBtn" class="py-2.5 px-2 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 transition">
-        2. SKAN Z BOKU (Kolana & Chód)<br>
-        <span class="font-normal text-[10px] opacity-85">Pkt 7–10: Głowa, APT, Wyprost Kolan, Normy Chodu</span>
-      </button>
-    </div>
+    <!-- Wybór płaszczyzny skanu (3 tryby: Przód, Bok, Tył) + Karta Instrukcji -->
+    <div class="bg-slate-900 p-2 rounded-xl border border-slate-800 space-y-2">
+      <div class="grid grid-cols-3 gap-1.5">
+        <button id="modeFrontBtn" class="py-2 px-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition">
+          1. PRZÓD<br>
+          <span class="font-normal text-[10px] opacity-85">Pkt 1–6 + Przyw.</span>
+        </button>
+        <button id="modeSideBtn" class="py-2 px-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 transition">
+          2. BOK<br>
+          <span class="font-normal text-[10px] opacity-85">Pkt 7–10 + Chód</span>
+        </button>
+        <button id="modeBackBtn" class="py-2 px-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 transition">
+          3. TYŁ<br>
+          <span class="font-normal text-[10px] opacity-85">Pięty, QL, Rytm</span>
+        </button>
+      </div>
 
-    <!-- Pasek instrukcji -->
-    <div class="bg-slate-900/95 px-3 py-2 rounded-xl border border-slate-800 text-xs text-slate-200 flex items-center justify-between gap-2">
-      <span id="instructionText"><strong>1. Skan z Przodu:</strong> Powieś telefon pionowo na wysokości pasa. Włącz kamerę, stań przodem w pełnym kadrze (od stóp do głowy), zrób kilka kroków i kliknij „Zakończ skan”.</span>
-      <span id="verifyModeBadge" class="hidden shrink-0 bg-amber-500/20 text-amber-300 border border-amber-500/50 px-2 py-0.5 rounded text-[10px] font-bold">TEST ĆWICZENIEM</span>
+      <!-- Karta instrukcji dopasowana do wybranego skanu -->
+      <div id="scanGuideCard" class="bg-slate-950/90 p-2.5 rounded-lg border border-slate-800 text-xs space-y-1.5">
+        <div class="flex items-center justify-between gap-2">
+          <span id="guideTitle" class="font-bold text-sky-400">📋 Jak wykonać Skan 1 (Z PRZODU):</span>
+          <span id="verifyModeBadge" class="hidden shrink-0 bg-amber-500/20 text-amber-300 border border-amber-500/50 px-2 py-0.5 rounded text-[10px] font-bold">TEST ĆWICZENIEM</span>
+        </div>
+        <div id="guideDetails" class="text-[11px] text-slate-300 space-y-1 leading-relaxed"></div>
+      </div>
     </div>
 
     <!-- Przyciski kamery i wideo -->
@@ -88,10 +97,10 @@
         ▶ Włącz kamerę
       </button>
       <button id="autoScanBtn" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold py-2.5 px-3 rounded-lg hidden">
-        ⏱ Auto-Skan 12s
+        ⏱ Auto-Skan 15s
       </button>
       <button id="stopCamBtn" class="flex-1 bg-red-600 hover:bg-red-500 text-white text-xs font-bold py-2.5 px-3 rounded-lg hidden shadow">
-        ⏹ Zakończ skan (Wyłącz kamerę)
+        ⏹ Zakończ skan (Wyłącz)
       </button>
       <button id="switchCamBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold py-2.5 px-3 rounded-lg border border-slate-700 hidden">
         Obróć
@@ -111,7 +120,7 @@
         <div class="text-3xl">📷</div>
         <div class="text-sm font-bold text-slate-300">Kamera fizycznie wyłączona</div>
         <div class="text-xs text-slate-400 max-w-xs mx-auto">
-          Włącz kamerę lub wgraj nagrany film z korytarza/bieżni. Twarz zamazywana jest natychmiast na żywo, a pomiar startuje dopiero po wykryciu całej sylwetki człowieka.
+          Wybierz powyżej płaszczyznę (Przód, Bok lub Tył), przeczytaj krótką instrukcję ustawienia i uruchom kamerę lub wgraj nagrane wideo.
         </div>
       </div>
 
@@ -119,7 +128,7 @@
         Szukam sylwetki człowieka...
       </div>
 
-      <div id="liveKneeHUD" class="hidden absolute bottom-2 left-2 right-2 p-2 rounded-lg bg-slate-950/90 border border-slate-700 text-[11px] flex justify-around text-slate-200"></div>
+      <div id="liveBottomHUD" class="hidden absolute bottom-2 left-2 right-2 p-2 rounded-lg bg-slate-950/90 border border-slate-700 text-[11px] flex justify-around text-slate-200"></div>
 
       <div id="countdownOverlay" class="hidden absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center p-4 text-center">
         <div class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-2">Odejdź od telefonu i ustaw całe ciało w kadrze</div>
@@ -127,18 +136,36 @@
       </div>
     </div>
 
-    <!-- PODSUMOWANIE 10 PUNKTÓW KONTROLNYCH -->
+    <!-- NOWOŚĆ v10.0: LOKALNY TŁUMACZ KOMPENSACJI MIĘŚNIOWYCH -->
+    <div id="compensationSection" class="bg-slate-900 p-3.5 rounded-xl border-2 border-amber-500/35 space-y-2.5 shadow-lg">
+      <div class="flex justify-between items-start gap-2 border-b border-slate-800 pb-2">
+        <div>
+          <h2 class="text-xs sm:text-sm font-black uppercase tracking-wider text-amber-400">
+            🧠 Tłumacz Kompensacji (Wzorce Ruchu w Chodzie)
+          </h2>
+          <p class="text-[11px] text-slate-400">
+            Łączy jednoczesne błędy stawowe w hipotezy mięśniowe (np. lędźwia zamiast pośladka, przywodziciele, QL, mikro-utykanie).
+          </p>
+        </div>
+        <span id="compCountBadge" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-bold shrink-0">0 wzorców</span>
+      </div>
+      <div id="compensationList" class="space-y-2 text-xs">
+        <p class="text-slate-400 italic">Wykonaj Skan z Przodu, z Boku lub z Tyłu (stanie + kilka kroków), aby system przeanalizował kompensacje mięśniowe.</p>
+      </div>
+    </div>
+
+    <!-- PODSUMOWANIE 12 PUNKTÓW KONTROLNYCH -->
     <div id="summarySection" class="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-3 shadow-lg">
       <div class="flex justify-between items-start gap-2 border-b border-slate-800 pb-2">
         <div>
           <h2 class="text-xs sm:text-sm font-black uppercase tracking-wider text-sky-400">
-            Podsumowanie 10 Punktów & Norm Chodu
+            Podsumowanie 12 Punktów, Pięt i Rytmu Chodu
           </h2>
           <p class="text-[11px] text-slate-400">
-            Kliknij dowolny kafelek (szczególnie <strong class="text-red-400">NIE OK</strong>), aby obejrzeć zapisany zrzut z czerwonym zaznaczeniem, tabelę norm oraz nagrać test potwierdzający.
+            Kliknij dowolny kafelek (szczególnie <strong class="text-red-400">NIE OK</strong>), aby zobaczyć zrzut błędu z czerwonym zaznaczeniem, normy oraz nagrać test potwierdzający.
           </p>
         </div>
-        <button id="resetAllBtn" class="text-[11px] text-slate-400 hover:text-red-400 underline shrink-0">Resetuj</button>
+        <button id="resetAllBtn" class="text-[11px] text-slate-400 hover:text-red-400 underline shrink-0">Resetuj wszystko</button>
       </div>
 
       <div id="pointsListContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
@@ -156,7 +183,7 @@
 
         <!-- Tabela norm klinicznych -->
         <div id="inspNormsTableBox" class="hidden p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs space-y-1.5">
-          <div class="font-bold text-sky-400">📊 Twoje pomiary vs normy biomechaniczne (95. percentyl):</div>
+          <div class="font-bold text-sky-400">📊 Twoje pomiary vs normy biomechaniczne:</div>
           <div id="inspNormsTableContent" class="space-y-1 text-[11px]"></div>
         </div>
 
@@ -193,7 +220,7 @@
           <div id="inspVerifyResultBox" class="hidden p-2.5 rounded bg-slate-950 border border-slate-700 text-sky-300 font-medium"></div>
 
           <button id="recordVerificationBtn" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-3 rounded-lg shadow text-xs">
-            🎥 Włącz kamerę i nagraj ten test teraz (12s Auto-Test)
+            🎥 Włącz kamerę i nagraj ten test teraz (15s Auto-Test)
           </button>
         </div>
 
@@ -222,7 +249,7 @@
       </div>
 
       <button id="runAiAnalysisBtn" class="w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-lg">
-        ✨ Analizuj 10 Punktów + Zdjęcia Błędów w Gemini AI (Klucz API)
+        ✨ Analizuj 12 Punktów + Wzorce Kompensacji + Zdjęcia w Gemini AI
       </button>
       <div id="aiResponseBox" class="hidden p-3 rounded-xl bg-slate-950 border border-sky-800/60 text-xs text-slate-200 ai-prose leading-relaxed space-y-1.5"></div>
     </div>
@@ -291,43 +318,71 @@
       return sorted[idx];
     }
 
-    // --- 2. SPECYFIKACJA 10 PUNKTÓW KONTROLNYCH ---
+    // --- 2. INSTRUKCJE DLA KAŻDEGO Z 3 TRYBÓW SKANU ---
+    const SCAN_GUIDES = {
+      FRONT: {
+        title: "📋 Jak wykonać Skan 1 (Z PRZODU – Punkty 1–6 + Przywodziciele):",
+        html: `
+          <div>• <strong>Telefon:</strong> Ustaw pionowo na wysokości pasa/klatki (ok. 100–120 cm), w odległości <strong>2.5–3 m</strong> (musisz się mieścić od stóp do głowy).</div>
+          <div>• <strong>Strój:</strong> Dopasowana koszulka i spodenki, najlepiej boso.</div>
+          <div>• <strong>Ruch:</strong> Stań swobodnie przodem przez <strong>4 sekundy</strong> (nie poprawiaj się na siłę), a następnie przejdź naturalnym krokiem w stronę kamery, cofnij się i przejdź jeszcze raz.</div>
+        `
+      },
+      SIDE: {
+        title: "📋 Jak wykonać Skan 2 (Z BOKU – APT, Wyprost Kolan, Chód, Lędźwia):",
+        html: `
+          <div>• <strong>Telefon:</strong> Ustaw idealnie pionowo (nie pochylaj w dół) na wysokości bioder, <strong>3 m</strong> od linii marszu (do pełnego chodu najlepiej nagrać korytarz i użyć „Wgraj wideo”).</div>
+          <div>• <strong>Strój:</strong> Krótkie spodenki/legginsy (luźne dresy przekłamują kąt wyprostu kolana o 5–10°).</div>
+          <div>• <strong>Ruch:</strong> Stań bokiem na luzie przez <strong>4 sekundy</strong> (pomiar APT i wyprostu), po czym przejdź naturalnym krokiem bokiem w lewo i w prawo przed obiektywem.</div>
+        `
+      },
+      BACK: {
+        title: "📋 Jak wykonać Skan 3 (Z TYŁU – Koślawienie Pięt, Łopatki, Miednica, QL):",
+        html: `
+          <div>• <strong>Telefon:</strong> Postaw <strong>niżej (50–70 cm nad podłogą)</strong>, ok. 2–2.5 m za plecami, w dobrze oświetlonym miejscu.</div>
+          <div>• <strong>Strój:</strong> Koniecznie <strong>BOSO lub w cienkich skarpetkach</strong> i w spodenkach (w butach kamera oceni kształt podeszwy zamiast pięty i Achillesa).</div>
+          <div>• <strong>Ruch:</strong> Stań tyłem do kamery na <strong>4 sekundy</strong>, potem przejdź kilka kroków od kamery i z powrotem.</div>
+        `
+      }
+    };
+
+    // --- 3. SPECYFIKACJA 12 PUNKTÓW KONTROLNYCH ---
     const POINTS_SPEC = {
       P1_HEAD_TILT: {
         id: "P1_HEAD_TILT", scanView: "FRONT",
         name: "1. Ustawienie głowy (Przód)",
-        normText: "Norma: < 3.5° odchylenia",
-        whyNotOk: "Linia uszu i oczu ucieka w bok względem poziomu. Najczęściej jest to odruchowa kompensacja asymetrii barków lub skośnej miednicy (mózg próbuje wypoziomować horyzont).",
-        muscles: "Przykurczone: Mięsień mostkowo-obojczykowo-sutkowy (MOS) i dźwigacz łopatki po stronie pochylenia. Osłabione: Zginacze boczne po stronie przeciwnej.",
+        normText: "Norma: < 3.5°",
+        whyNotOk: "Linia uszu i oczu ucieka w bok względem poziomu. Najczęściej to odruchowa kompensacja asymetrii barków lub skośnej miednicy (mózg poziomuje horyzont).",
+        muscles: "Przykurczone: MOS i dźwigacz łopatki po stronie pochylenia. Osłabione: Zginacze boczne szyi po stronie przeciwnej.",
         testTitle: "Test: Aktywne wyrównanie barków i szyi przy wznosie ramion (Przód)",
         testDesc: "Stań przodem, opuść barki w dół i zrób 3 powolne wznosy ramion bokiem, pilnując idealnie pionowej głowy.",
-        corrective: "Poizometryczna relaksacja szyi (delikatny skłon ucha do przeciwnego barku z oporem dłoni 10s, 3 serie) + kontrola osi głowy."
+        corrective: "Poizometryczna relaksacja szyi (skłon ucha do przeciwnego barku z lekkim oporem dłoni 10s, 3 serie) + kontrola osi głowy."
       },
       P2_SHOULDERS: {
         id: "P2_SHOULDERS", scanView: "FRONT",
         name: "2. Poziom barków (Lewy vs Prawy)",
-        normText: "Norma: < 2.8° różnicy",
-        whyNotOk: "Jeden bark jest wyraźnie niżej. Przyczyną bywa spięty górny kaptur po stronie wyższej albo przykurczony mięsień najszerszy grzbietu i QL ściągający drugi bark w dół.",
+        normText: "Norma: < 2.8°",
+        whyNotOk: "Jeden bark leży niżej od drugiego. Przyczyną bywa spięty górny kaptur po stronie wyższej albo przykurczony najszerszy grzbietu i QL ściągający drugi bark w dół.",
         muscles: "Przykurczone: Najszerszy grzbietu i piersiowy mniejszy (strona niższa) lub górny kaptur (strona wyższa). Osłabione: Dolny czworoboczny i zębaty przedni.",
-        testTitle: "Test: Pełny wznos obu ramion nad głowę (Overhead Elevation)",
+        testTitle: "Test: Pełny wznos obu ramion nad głowę (Przód)",
         testDesc: "Stań przodem i unieś powoli obie proste ręce bokiem maksymalnie nad głowę (3 razy). Różnica zakresu między rękami potwierdzi przykurcz najszerszego grzbietu.",
         corrective: "Wall Slides (ślizgi przedramion po ścianie w górę z równymi barkami – 3 x 12) + rolowanie mięśnia najszerszego pod pachą."
       },
       P3_TRUNK_SHIFT: {
         id: "P3_TRUNK_SHIFT", scanView: "FRONT",
         name: "3. Oś boczna tułowia (Shift klatki)",
-        normText: "Norma: < 3.0% przesunięcia",
+        normText: "Norma: < 3.0%",
         whyNotOk: "Środek klatki piersiowej ucieka w bok względem środka miednicy. To klasyczny sygnał asymetrii napięcia mięśnia czworobocznego lędźwi (QL).",
         muscles: "Przykurczone: Czworoboczny lędźwi (QL) i skośne po jednej stronie. Osłabione: Stabilizatory boczne tułowia i pośladek średni.",
         testTitle: "Test: Skłon boczny tułowia w lewo i w prawo (Przód)",
-        testDesc: "Stań przodem i ześlizgnij dłoń po udzie do kolana – raz maksymalnie w lewo, raz maksymalnie w prawo. Porównamy symetrię zgięcia bocznego.",
+        testDesc: "Stań przodem i ześlizgnij dłoń po udzie do kolana – raz maksymalnie w lewo, raz maksymalnie w prawo.",
         corrective: "Deska boczna (Side Plank – 3 x 30s na słabszą stronę) oraz spacer farmera z ciężarem w jednej ręce (Suitcase Carry)."
       },
       P4_PELVIS_FRONT: {
         id: "P4_PELVIS_FRONT", scanView: "FRONT",
-        name: "4. Poziom miednicy (Przód)",
-        normText: "Norma: < 3.2° nachylenia",
-        whyNotOk: "Jedno biodro opada niżej podczas stania lub kroku (objaw Trendelenburga). Zaburza to symetrię długości nóg i przeciąża lędźwie.",
+        name: "4. Poziom miednicy (Przód / Tył)",
+        normText: "Norma: < 3.2°",
+        whyNotOk: "Jedno biodro opada niżej podczas stania lub kroku (objaw Trendelenburga), przeciążając lędźwie i zaburzając pracę nóg.",
         muscles: "Przykurczone: Czworoboczny lędźwi (QL) po stronie wyższej i przywodziciele po stronie podporowej. Osłabione: Mięsień pośladkowy średni.",
         testTitle: "Test: Stanie na 1 nodze – Test Trendelenburga (Przód)",
         testDesc: "Stań przodem na lewej nodze przez 6 sekund, a potem na prawej przez 6 sekund. Opadnięcie miednicy lub bujnięcie barkami potwierdza słabość pośladka średniego.",
@@ -336,62 +391,82 @@
       P5_KNEES_FRONT: {
         id: "P5_KNEES_FRONT", scanView: "FRONT",
         name: "5. Oś boczna kolan (Koślawość L/P)",
-        normText: "Norma kliniczna: 0–5° (próg kamery: 6.5°)",
-        whyNotOk: "Kolano ucieka do środka (koślawość / valgus) lub na zewnątrz względem linii biodro–kostka, powodując krzywe obciążanie stawu i stopy.",
-        muscles: "Przykurczone: Pasmo biodrowo-piszczelowe (TFL) i przywodziciele uda. Osłabione: Mięsień pośladkowy średni (rotator zewnętrzny uda).",
+        normText: "Norma klin.: 0–5° (próg 6.5°)",
+        whyNotOk: "Kolano ucieka do środka (koślawość / valgus) lub na zewnątrz względem linii biodro–kostka. W połączeniu ze zwężonym krokiem wskazuje na dominację przywodzicieli lub słaby pośladek średni.",
+        muscles: "Przykurczone: Przywodziciele uda i pasmo biodrowo-piszczelowe (TFL). Osłabione: Mięsień pośladkowy średni (rotator zewnętrzny uda).",
         testTitle: "Test: Półprzysiad kontrolny przodem (Tor kolan)",
         testDesc: "Stań przodem na szerokość bioder i wykonaj 3 powolne półprzysiady. Sprawdzimy, czy pod obciążeniem kolana zapadają się do środka.",
-        corrective: "Monster Walk (chodzenie z gumą Mini-Band nad kolanami – 3 x 15 kroków) z kontrolą osi rzepki nad drugim palcem stopy."
+        corrective: "Monster Walk (chodzenie z gumą Mini-Band nad kolanami – 3 x 15 kroków) + rolowanie przywodzicieli wewnętrznej strony uda."
       },
       P6_FEET_ANKLES: {
         id: "P6_FEET_ANKLES", scanView: "FRONT",
-        name: "6. Symetria stóp i stawów skokowych",
-        normText: "Norma: < 3.5% asymetrii rotacji",
-        whyNotOk: "Jedna stopa odkręca się mocniej na zewnątrz podczas stania lub chodu – często jako ucieczka przed ograniczonym zgięciem grzbietowym w kostce.",
-        muscles: "Przykurczone: Mięsień płaszczkowaty i brzuchaty łydki. Osłabione: Mięsień piszczelowy tylny (łuk stopy).",
+        name: "6. Rotacja stóp i zwężanie kroku",
+        normText: "Norma: < 3.5% asymetrii",
+        whyNotOk: "Jedna stopa odkręca się mocniej na zewnątrz lub wchodzi za linię środka ciała (crossover gait) – ucieczka przed ograniczonym zgięciem kostki lub ściąganie przez przywodziciele.",
+        muscles: "Przykurczone: Mięsień płaszczkowaty łydki i przywodziciele. Osłabione: Piszczelowy tylny (łuk stopy) i pośladek średni.",
         testTitle: "Test: Mobilność piszczeli w wykroku BOKIEM (Kostka)",
-        testDesc: "Stań BOKIEM w wykroku i wypchnij kolano przedniej nogi maksymalnie w przód nad palce bez odrywania pięty od podłogi (norma > 30°).",
+        testDesc: "Stań BOKIEM w wykroku i wypchnij kolano przedniej nogi maksymalnie w przód nad palce bez odrywania pięty (norma > 30°).",
         corrective: "Mobilizacja stawu skokowego przy ścianie (Knee-to-Wall – 3 x 15) + rolowanie dolnej części łydki piłeczką."
       },
       P7_HEAD_FORWARD: {
         id: "P7_HEAD_FORWARD", scanView: "SIDE",
         name: "7. Wystająca głowa i plecy (Bok)",
-        normText: "Norma: < 13.5° przed osią barku",
+        normText: "Norma: < 13.5° przed barkiem",
         whyNotOk: "Ucho znajduje się wyraźnie przed pionową linią barku (protrakcja szyi), przeciążając kark i zaokrąglając odcinek piersiowy.",
         muscles: "Przykurczone: Mięśnie piersiowe, podpotyliczne i górny kaptur. Osłabione: Głębokie zginacze szyi i dolny czworoboczny.",
         testTitle: "Test: Przysiad bokiem z rękami nad głową",
-        testDesc: "Stań BOKIEM, unieś proste ręce przy uszach i zrób przysiad. Ucieczka głowy i rąk do przodu potwierdza przykurcz klatki i piersiowego.",
+        testDesc: "Stań BOKIEM, unieś proste ręce przy uszach i zrób przysiad. Ucieczka głowy i rąk w przód potwierdza przykurcz klatki i piersiowego.",
         corrective: "Cofanie brody poziomo w tył ('Chin Tucks' – 3 x 12 z 3s pauzą) + otwieranie klatki piersiowej na wałku."
       },
       P8_PELVIS_APT: {
         id: "P8_PELVIS_APT", scanView: "SIDE",
         name: "8. Przodopochylenie miednicy APT (Bok)",
-        normText: "Norma w staniu: < 3.6% przed osią",
-        whyNotOk: "W staniu miednica jest wypchnięta do przodu przed oś kostka–bark (Zespół Skrzyżowania Dolnego). Skrócone zginacze biodra ciągną miednicę w przód.",
-        muscles: "Przykurczone: Mięsień biodrowo-lędźwiowy (iliopsoas), prosty uda i prostowniki lędźwi. Osłabione: Pośladkowy wielki i mięśnie głębokie brzucha.",
+        normText: "Norma w staniu: < 3.6%",
+        whyNotOk: "W staniu miednica jest wypchnięta przed oś kostka–bark (Zespół Skrzyżowania Dolnego). Skrócone zginacze biodra ciągną miednicę w przód i wymuszają kompensacje lędźwiowe.",
+        muscles: "Przykurczone: Biodrowo-lędźwiowy (iliopsoas), prosty uda i prostowniki lędźwi. Osłabione: Pośladkowy wielki i mięśnie głębokie brzucha.",
         testTitle: "Test: Wykrok zginaczy biodra BOKIEM (L vs P)",
         testDesc: "Stań BOKIEM, zrób długi wykrok, podwiń miednicę pod siebie i trzymaj tułów pionowo. Sprawdzimy wyprost tylnego biodra (norma > 12°) i czy tułów nie ucieka w przód.",
-        corrective: "Couch Stretch (rozciąganie kanapowe z mocno podwiniętą miednicą i napiętym pośladkiem – 3 x 45s) + Dead Bug z lędźwiami dociśniętymi do maty (3 x 12)."
+        corrective: "Couch Stretch (z mocno podwiniętą miednicą i napiętym pośladkiem – 3 x 45s) + Dead Bug (lędźwia wklejone w matę – 3 x 12) + 90-90 Hip Lift z piętami na krześle."
       },
       P9_KNEE_EXTENSION: {
         id: "P9_KNEE_EXTENSION", scanView: "SIDE",
-        name: "9. Pełny wyprost / przeprost kolan (Bok L/P)",
-        normText: "Norma (95. perc.): 173°–180° | Przeprost > 184°",
-        whyNotOk: "Kolano nie osiąga stabilnego pełnego wyprostu (< 173° – przykurcz zgięciowy) ALBO ryglujesz je w przeproście do tyłu (> 184° – genu recurvatum, częsta kompensacja APT).",
-        muscles: "Brak wyprostu (<173°): Przykurczone kulszowo-goleniowe (dwugłowy uda) i brzuchaty łydki, słaba głowa przyśrodkowa czworogłowego (VMO). Przeprost (>184°): Słaba kontrola dwugłowego i kompensacja APT.",
-        testTitle: "Test: Maksymalny czynny doprost kolan w staniu (TKE Test - Bok)",
-        testDesc: "Stań BOKIEM do kamery. Napnij mocno czworogłowe ud, próbując w pełni wyprostować kolana bez wypychania bioder w przód (utrzymaj 8s). Zmierzymy 95. percentyl kąta wyprostu.",
-        corrective: "Brak wyprostu: TKE (Terminal Knee Extension z gumą pod kolanem, doprost ostatnich 20° z 3s pauzą – 3 x 15) + rozciąganie dwugłowego uda. Przeprost: Nauka stania z lekko 'miękkim' kolanem i napiętym pośladkiem."
+        name: "9. Pełny wyprost / przeprost kolan (Bok)",
+        normText: "Norma (P95): 173°–180° | >184° przeprost",
+        whyNotOk: "Kolano nie osiąga stabilnego pełnego wyprostu (< 173°) ALBO ryglujesz je w przeproście do tyłu (> 184° – genu recurvatum, częsta kompensacja APT).",
+        muscles: "Niedowyprost (<173°): Przykurczone kulszowo-goleniowe i brzuchaty łydki, słabe VMO. Przeprost (>184°): Słaba kontrola dwugłowego uda i kompensacja APT.",
+        testTitle: "Test: Czynny doprost kolan w staniu (TKE Test - Bok)",
+        testDesc: "Stań BOKIEM. Napnij mocno czworogłowe ud, prostując maksymalnie kolana bez wypychania bioder w przód (utrzymaj 8s).",
+        corrective: "Niedowyprost: TKE z gumą pod kolanem (doprost ostatnich 20° z 3s pauzą – 3 x 15) + rozciąganie tyłu uda. Przeprost: Stanie na odblokowanych kolanach z aktywnym pośladkiem."
       },
       P10_GAIT_NORMS: {
         id: "P10_GAIT_NORMS", scanView: "SIDE",
-        name: "10. Analiza chodu wg norm klinicznych (Bok)",
-        normText: "Wyprost ≥173° | Zgięcie 40–65° | Zakrok ≥10°",
-        whyNotOk: "Podczas chodu kąty odbiegają od fizjologii kroku: kolano nie prostuje się przy uderzeniu pięty i w podporze (< 173°), nie zgina się płynnie w przenoszeniu (< 40° – sztywna noga), lub biodro nie otwiera się w zakroku (< 10°).",
-        muscles: "Zaburzenia cyklu chodu: Przykurczony biodrowo-lędźwiowy (blokuje zakrok), skrócone kulszowo-goleniowe (blokują doprost kolana przy kontakcie pięty) oraz słaby pośladek wielki.",
-        testTitle: "Test: Marsz kontrolny BOKIEM z pełnym doprostem kolana (12s)",
-        testDesc: "Przejdź się BOKIEM (najlepiej po korytarzu lub na bieżni), zaczynając każdy krok od kontaktu pięty na wyprostowanym kolanie i dopinając pośladek nogi zakrocznej.",
-        corrective: "Ćwiczenie kroku z pauzą na uderzeniu pięty (Heel-Strike Drill z doprostem VMO) + mobilizacja zginaczy biodra przed marszem."
+        name: "10. Normy cyklu chodu (Bok)",
+        normText: "Wyprost ≥173° | Zgięcie ≥40° | Zakrok ≥10°",
+        whyNotOk: "Podczas chodu kąty odbiegają od fizjologii: niedoprost kolana przy kontakcie pięty (<173°), sztywne kolano w przenoszeniu (<40°) lub zablokowany zakrok biodra (<10° – ciągnięcie kroku lędźwiami).",
+        muscles: "Przykurczony biodrowo-lędźwiowy (blokuje zakrok i włącza lędźwia), skrócone kulszowo-goleniowe oraz nieaktywny pośladek wielki.",
+        testTitle: "Test: Marsz kontrolny BOKIEM z doprostem i zakrokiem",
+        testDesc: "Przejdź się BOKIEM spokojnym krokiem, zaczynając od kontaktu pięty na prostym kolanie i świadomie dopinając pośladek nogi zostającej z tyłu.",
+        corrective: "Heel-Strike Drill (krok z pauzą na pięcie i doprostem VMO) + aktywacja pośladka (Glute Bridge jednonóż – 3 x 10) przed spacerem."
+      },
+      P11_REAR_HEELS_BACK: {
+        id: "P11_REAR_HEELS_BACK", scanView: "BACK",
+        name: "11. Koślawienie pięt i kostek (Tył)",
+        normText: "Norma: oś kolano–kostka–pięta w pionie",
+        whyNotOk: "W widoku z tyłu kostka zapada się do środka względem linii łydki i pięty (koślawość pięty / nadmierna pronacja stopy). Powoduje to rotację wewnętrzną piszczeli i ucieczkę kolana.",
+        muscles: "Osłabione: Mięsień piszczelowy tylny (główny stabilizator łuku stopy), strzałkowy długi i mięśnie krótkie stopy. Przykurczone: Strzałkowe i łydka.",
+        testTitle: "Test: Wspięcia na palce od TYŁU (Boso)",
+        testDesc: "Stań TYŁEM boso przed nisko ustawioną kamerą i wykonaj 8 powolnych wspięć na palce. Prawidłowo pięty powinny lekko skręcić się do środka (inwersja) – jeśli zostają przekrzywione na zewnątrz, piszczelowy tylny nie trzyma łuku.",
+        corrective: "Ćwiczenie 'Krótkiej Stopy' (Short Foot – 3 x 12 przytrzymań po 5s) + wspięcia na palce ze ściśniętą piłeczką tenisową między kostkami (3 x 15)."
+      },
+      P12_STEP_SYMMETRY: {
+        id: "P12_STEP_SYMMETRY", scanView: "SIDE",
+        name: "12. Rytm i symetria czasu kroku (L vs P)",
+        normText: "Norma asymetrii rytmu: < 8.0%",
+        whyNotOk: "Czas trwania kroku lewej i prawej nogi wyraźnie się różni (mikro-utykanie). Organizm podświadomie skraca fazę podparcia na nodze słabszej, mniej stabilnej lub przeciążonej.",
+        muscles: "Asymetria siły i stabilizacji: zwykle słabszy pośladek średni / wielki lub ograniczony zakres kostki/biodra po stronie krótszego kroku.",
+        testTitle: "Test: Marsz rytmiczny z równym czasem podparcia (Bok / Przód)",
+        testDesc: "Przejdź się spokojnym, równym rytmem (min. 6 kroków w kadrze), licząc w myślach równe tempo 'raz – dwa – raz – dwa'. Sprawdzimy, czy asymetria znika przy świadomej kontroli.",
+        corrective: "Jednostronny trening stabilizacji na słabszą nogę (Split Squat, Single-Leg RDL, stanie jednonóż z kontrolą miednicy – 3 x 10 na stronę)."
       }
     };
 
@@ -412,7 +487,7 @@
     }
     initPointsData();
 
-    // --- 3. ELEMENTY DOM ---
+    // --- 4. ELEMENTY DOM ---
     const video = document.getElementById("video");
     const canvas = document.getElementById("outputCanvas");
     const ctx = canvas.getContext("2d");
@@ -427,19 +502,26 @@
     const apiKeySavedStatus = document.getElementById("apiKeySavedStatus");
     const blurToggleBtn = document.getElementById("blurToggleBtn");
     const voiceBtn = document.getElementById("voiceBtn");
+
     const modeFrontBtn = document.getElementById("modeFrontBtn");
     const modeSideBtn = document.getElementById("modeSideBtn");
-    const instructionText = document.getElementById("instructionText");
+    const modeBackBtn = document.getElementById("modeBackBtn");
+    const guideTitle = document.getElementById("guideTitle");
+    const guideDetails = document.getElementById("guideDetails");
     const verifyModeBadge = document.getElementById("verifyModeBadge");
+
     const startCamBtn = document.getElementById("startCamBtn");
     const autoScanBtn = document.getElementById("autoScanBtn");
     const stopCamBtn = document.getElementById("stopCamBtn");
     const switchCamBtn = document.getElementById("switchCamBtn");
     const videoUpload = document.getElementById("videoUpload");
     const liveBanner = document.getElementById("liveBanner");
-    const liveKneeHUD = document.getElementById("liveKneeHUD");
+    const liveBottomHUD = document.getElementById("liveBottomHUD");
     const countdownOverlay = document.getElementById("countdownOverlay");
     const countdownNumber = document.getElementById("countdownNumber");
+
+    const compensationList = document.getElementById("compensationList");
+    const compCountBadge = document.getElementById("compCountBadge");
     const pointsListContainer = document.getElementById("pointsListContainer");
     const resetAllBtn = document.getElementById("resetAllBtn");
 
@@ -469,7 +551,7 @@
     const aiResponseBox = document.getElementById("aiResponseBox");
     const printReportView = document.getElementById("printReportView");
 
-    // --- 4. KLUCZ GEMINI API (localStorage) ---
+    // --- 5. KLUCZ GEMINI API ---
     const STORAGE_KEY_API = "gemini_posture_api_key_v9";
     function updateApiKeyStatus() {
       const saved = localStorage.getItem(STORAGE_KEY_API);
@@ -492,12 +574,12 @@
       localStorage.removeItem(STORAGE_KEY_API); apiKeyInput.value = ""; updateApiKeyStatus();
     });
 
-    // --- 5. ZMIENNE STANU I BUFORY ---
+    // --- 6. ZMIENNE STANU I AKUMULATORY ---
     let poseLandmarker = null;
     let faceDetector = null;
-    let scanDirection = "FRONT";
+    let scanDirection = "FRONT"; // FRONT | SIDE | BACK
     let verifyingPointId = null;
-    let verifyBuffer = { main: [], aux: [], hyperCount: 0 };
+    let verifyBuffer = { main: [], aux: [], hyperCount: 0, stepsL: [], stepsR: [] };
 
     let isCameraRunning = false;
     let isLiveStream = false;
@@ -515,21 +597,32 @@
     let autoStopTimestamp = 0;
     let countdownTimer = null;
 
+    // Tracker rytmu kroków (Symetria czasu kroku L vs P)
+    let stepTracker = { lastState: null, lastSwitchMs: 0 };
+
     let accum = {};
+    let detectedCompensations = [];
+
     function resetAccumulators() {
+      stepTracker = { lastState: null, lastSwitchMs: 0 };
+      detectedCompensations = [];
       accum = {
         frontFrames: 0,
         sideFrames: 0,
+        backFrames: 0,
         sideStandingFrames: 0,
         sideStepFrames: 0,
+        frontBackStepFrames: 0,
+
         headTiltSum: 0,
         shTiltSum: 0, shLowerSide: "",
         trunkShiftSum: 0,
-        pelvicTiltSum: 0,
+        pelvicTiltSum: 0, pelvicSamplesCount: 0,
         kneeValgusMaxSum: 0, worseKneeSide: "",
         footAsymSum: 0,
         headForwardSum: 0,
         aptShiftSamples: [],
+
         kneeExtSamplesL: [],
         kneeExtSamplesR: [],
         kneeSwingSamplesL: [],
@@ -537,12 +630,29 @@
         hyperExtSamplesL: [],
         hyperExtSamplesR: [],
         hipTrailSamplesL: [],
-        hipTrailSamplesR: []
+        hipTrailSamplesR: [],
+
+        // Widok z tyłu (koślawienie pięt / kostek)
+        rearPronationSamplesL: [],
+        rearPronationSamplesR: [],
+        rearPelvicTiltSum: 0,
+        rearShTiltSum: 0,
+
+        // Symetria czasu kroku (ms)
+        stepDurationsL: [],
+        stepDurationsR: [],
+
+        // Liczniki wzorców kompensacji (Tłumacz Kompensacji)
+        compLumbarGaitFrames: 0,
+        compAdductorCrossoverFrames: 0,
+        compQlHipHikeLeftFrames: 0,
+        compQlHipHikeRightFrames: 0,
+        compRearPronationFrames: 0
       };
     }
     resetAccumulators();
 
-    // --- 6. INICJALIZACJA MEDIAPIPE POSE + FACE DETECTOR ---
+    // --- 7. INICJALIZACJA MEDIAPIPE POSE + FACE DETECTOR ---
     async function initMediaPipe() {
       try {
         const vision = await FilesetResolver.forVisionTasks(
@@ -576,7 +686,6 @@
           });
         }
 
-        // Niezależny detektor twarzy (działa natychmiast nawet z bliskiej odległości bez całego ciała!)
         try {
           faceDetector = await FaceDetector.createFromOptions(vision, {
             baseOptions: {
@@ -596,14 +705,13 @@
               runningMode: "VIDEO",
               minDetectionConfidence: 0.45
             });
-          } catch (__) {
-            faceDetector = null;
-          }
+          } catch (__) { faceDetector = null; }
         }
 
         modelStatus.textContent = `Gotowy (Pose ${usedMode}${faceDetector ? " + Auto-Blur Twarzy" : ""})`;
         modelStatus.className = "text-xs text-emerald-400 font-medium mt-0.5 truncate";
         startCamBtn.disabled = false;
+        setScanDirection("FRONT");
         renderPointsList();
         requestAnimationFrame(mainLoop);
       } catch (err) {
@@ -613,7 +721,7 @@
     }
     initMediaPipe();
 
-    // --- 7. WALIDATOR ANATOMII CZŁOWIEKA ---
+    // --- 8. WALIDATOR ANATOMII CZŁOWIEKA (Wspiera Przód, Bok oraz Tył bez widocznego nosa!) ---
     function isRealHumanAnatomy(pts, w, h) {
       const Nose = pts[0], LEar = pts[7], REar = pts[8];
       const LSh = pts[11], RSh = pts[12];
@@ -621,9 +729,12 @@
       const LKnee = pts[25], RKnee = pts[26];
       const LAnk = pts[27], RAnk = pts[28];
 
-      const headVis = Math.max(Nose.v, LEar.v, REar.v) > 0.70;
-      const shVis = (scanDirection === "FRONT") ? (LSh.v > 0.68 && RSh.v > 0.68) : (Math.max(LSh.v, RSh.v) > 0.68);
-      const hipVis = (scanDirection === "FRONT") ? (LHip.v > 0.68 && RHip.v > 0.68) : (Math.max(LHip.v, RHip.v) > 0.68);
+      const isBack = scanDirection === "BACK";
+      const headVis = isBack
+        ? Math.max(LEar.v, REar.v, Nose.v) > 0.48
+        : Math.max(Nose.v, LEar.v, REar.v) > 0.70;
+      const shVis = (scanDirection === "SIDE") ? (Math.max(LSh.v, RSh.v) > 0.68) : (LSh.v > 0.65 && RSh.v > 0.65);
+      const hipVis = (scanDirection === "SIDE") ? (Math.max(LHip.v, RHip.v) > 0.68) : (LHip.v > 0.65 && RHip.v > 0.65);
       const kneeVis = Math.max(LKnee.v, RKnee.v) > 0.62;
       const ankVis = Math.max(LAnk.v, RAnk.v) > 0.58;
 
@@ -631,23 +742,24 @@
         return { valid: false, reason: "Stań w pełnym kadrze (muszą być widoczne głowa, barki, biodra, kolana i stopy)" };
       }
 
+      const headY = (isBack && LEar.v > 0.45 && REar.v > 0.45) ? (LEar.y + REar.y) / 2 : (Nose.v > 0.5 ? Nose.y : Math.min(LEar.y, REar.y));
       const midShY = (LSh.y + RSh.y) / 2;
       const midHipY = (LHip.y + RHip.y) / 2;
       const bestKneeY = LKnee.v >= RKnee.v ? LKnee.y : RKnee.y;
       const bestAnkY = LAnk.v >= RAnk.v ? LAnk.y : RAnk.y;
 
-      const headToSh = midShY - Nose.y;
+      const headToSh = midShY - headY;
       const torsoLen = midHipY - midShY;
       const upperLegLen = bestKneeY - midHipY;
       const lowerLegLen = bestAnkY - bestKneeY;
-      const totalBodyHeight = bestAnkY - Nose.y;
+      const totalBodyHeight = bestAnkY - headY;
 
       if (
-        headToSh < 15 ||
-        torsoLen < 30 ||
-        upperLegLen < 24 ||
-        lowerLegLen < 20 ||
-        totalBodyHeight < h * 0.35
+        headToSh < 12 ||
+        torsoLen < 28 ||
+        upperLegLen < 22 ||
+        lowerLegLen < 18 ||
+        totalBodyHeight < h * 0.34
       ) {
         return { valid: false, reason: "Nie wykryto pełnej sylwetki człowieka – obiekt zignorowany" };
       }
@@ -659,21 +771,21 @@
       const shToTorsoRatio = shWidth / torsoLen;
 
       if (
-        torsoToLegRatio < 0.32 || torsoToLegRatio > 1.35 ||
-        headToTorsoRatio < 0.14 || headToTorsoRatio > 0.78 ||
-        shToTorsoRatio > 1.45
+        torsoToLegRatio < 0.30 || torsoToLegRatio > 1.38 ||
+        headToTorsoRatio < 0.12 || headToTorsoRatio > 0.80 ||
+        shToTorsoRatio > 1.48
       ) {
         return { valid: false, reason: "Proporcje obiektu nie odpowiadają sylwetce człowieka" };
       }
 
-      if (bestAnkY > h * 0.985 || Nose.y < h * 0.015) {
+      if (bestAnkY > h * 0.985 || headY < h * 0.015) {
         return { valid: false, reason: "Cofnij się o krok – stopy lub głowa wychodzą poza kadr" };
       }
 
       return { valid: true, reason: "OK" };
     }
 
-    // --- 8. PODWÓJNA TARCZA PRYWATNOŚCI TWARZY (Blisko + Daleko) ---
+    // --- 9. TARCZA PRYWATNOŚCI TWARZY ---
     function drawPrivacyMosaicCircle(targetCtx, centerX, centerY, radius) {
       targetCtx.save();
       targetCtx.beginPath();
@@ -736,15 +848,14 @@
       return true;
     }
 
-    // --- 9. ZRZUT BŁĘDU Z CZERWONYMI ZNACZNIKAMI I ZAMAZANĄ TWARZĄ ---
+    // --- 10. ZRZUT BŁĘDU ---
     function capturePointErrorSnapshot(pointId, severityScore, pts, redSegments, redJoints, bannerText, valueStr) {
       const pData = pointsData[pointId];
       if (!pData || severityScore <= pData.worstScore) return;
       if (!video.videoWidth || !video.videoHeight) return;
 
       pData.worstScore = severityScore;
-      const w = video.videoWidth;
-      const h = video.videoHeight;
+      const w = video.videoWidth, h = video.videoHeight;
       const snapCanvas = document.createElement("canvas");
       const scale = Math.min(1, 520 / w);
       snapCanvas.width = Math.round(w * scale);
@@ -755,10 +866,7 @@
       sCtx.scale(scale, scale);
 
       sCtx.save();
-      if (isLiveStream && facingMode === "user") {
-        sCtx.translate(w, 0);
-        sCtx.scale(-1, 1);
-      }
+      if (isLiveStream && facingMode === "user") { sCtx.translate(w, 0); sCtx.scale(-1, 1); }
       sCtx.drawImage(video, 0, 0, w, h);
       sCtx.restore();
 
@@ -771,7 +879,6 @@
         }
       }
 
-      // Trwałe zamazanie twarzy na zapisanym zdjęciu
       drawPoseHeadShield(sCtx, pts);
 
       sCtx.strokeStyle = "#ef4444";
@@ -808,18 +915,16 @@
       pData.snapshotUrl = snapCanvas.toDataURL("image/jpeg", 0.80);
     }
 
-    // --- 10. FIZYCZNE WŁĄCZANIE I WYŁĄCZANIE KAMERY ---
+    // --- 11. KAMERA I TRYBY ---
     function releaseCameraAndResetUI() {
       if (countdownTimer) clearInterval(countdownTimer);
       isCountingDown = false;
       autoStopTimestamp = 0;
       consecutiveHumanFrames = 0;
+      stepTracker = { lastState: null, lastSwitchMs: 0 };
       countdownOverlay.classList.add("hidden");
 
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-        currentStream = null;
-      }
+      if (currentStream) { currentStream.getTracks().forEach(track => track.stop()); currentStream = null; }
       video.pause();
       video.srcObject = null;
       video.removeAttribute("src");
@@ -829,7 +934,7 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       video.classList.add("hidden");
       liveBanner.classList.add("hidden");
-      liveKneeHUD.classList.add("hidden");
+      liveBottomHUD.classList.add("hidden");
       cameraOffPlaceholder.classList.remove("hidden");
 
       startCamBtn.classList.remove("hidden");
@@ -843,11 +948,8 @@
 
     function stopCameraHardware() {
       releaseCameraAndResetUI();
-      if (verifyingPointId) {
-        evaluateVerificationExercise(verifyingPointId);
-      } else {
-        finalizeScanSummary();
-      }
+      if (verifyingPointId) evaluateVerificationExercise(verifyingPointId);
+      else finalizeScanSummary();
     }
 
     async function startCameraHardware() {
@@ -855,6 +957,7 @@
       video.pause();
       isCameraRunning = false;
       consecutiveHumanFrames = 0;
+      stepTracker = { lastState: null, lastSwitchMs: 0 };
 
       if ("wakeLock" in navigator) { try { await navigator.wakeLock.request("screen"); } catch (_) {} }
 
@@ -871,8 +974,8 @@
         video.classList.remove("hidden");
         cameraOffPlaceholder.classList.add("hidden");
         liveBanner.classList.remove("hidden");
-        if (scanDirection === "SIDE") liveKneeHUD.classList.remove("hidden");
-        else liveKneeHUD.classList.add("hidden");
+        if (scanDirection === "SIDE" || scanDirection === "BACK") liveBottomHUD.classList.remove("hidden");
+        else liveBottomHUD.classList.add("hidden");
 
         startCamBtn.classList.add("hidden");
         autoScanBtn.classList.remove("hidden");
@@ -894,9 +997,9 @@
     });
 
     stopCamBtn.addEventListener("click", () => {
-      speak("Kamera wyłączona. Sprawdź podsumowanie dziesięciu punktów.", true);
+      speak("Kamera wyłączona. Sprawdź analizę kompensacji i 12 punktów.", true);
       stopCameraHardware();
-      document.getElementById("summarySection").scrollIntoView({ behavior: "smooth" });
+      document.getElementById("compensationSection").scrollIntoView({ behavior: "smooth" });
     });
 
     switchCamBtn.addEventListener("click", () => {
@@ -921,9 +1024,10 @@
           countdownOverlay.classList.add("hidden");
           isCountingDown = false;
           resetFilters();
-          if (verifyingPointId) verifyBuffer = { main: [], aux: [], hyperCount: 0 };
-          autoStopTimestamp = Date.now() + 12000;
-          speak("Start pomiaru. Dwanaście sekund.", true);
+          stepTracker = { lastState: null, lastSwitchMs: 0 };
+          if (verifyingPointId) verifyBuffer = { main: [], aux: [], hyperCount: 0, stepsL: [], stepsR: [] };
+          autoStopTimestamp = Date.now() + 15000;
+          speak("Start pomiaru. Piętnaście sekund.", true);
         }
       }, 1000);
     });
@@ -934,6 +1038,7 @@
       if (currentStream) { currentStream.getTracks().forEach(t => t.stop()); currentStream = null; }
       isLiveStream = false;
       consecutiveHumanFrames = 0;
+      stepTracker = { lastState: null, lastSwitchMs: 0 };
       video.srcObject = null;
       video.src = URL.createObjectURL(file);
       video.controls = true;
@@ -942,8 +1047,8 @@
       video.classList.remove("hidden");
       cameraOffPlaceholder.classList.add("hidden");
       liveBanner.classList.remove("hidden");
-      if (scanDirection === "SIDE") liveKneeHUD.classList.remove("hidden");
-      else liveKneeHUD.classList.add("hidden");
+      if (scanDirection === "SIDE" || scanDirection === "BACK") liveBottomHUD.classList.remove("hidden");
+      else liveBottomHUD.classList.add("hidden");
 
       startCamBtn.classList.add("hidden");
       autoScanBtn.classList.add("hidden");
@@ -958,27 +1063,34 @@
       if (isCameraRunning) {
         speak("Nagranie przeanalizowane.", true);
         stopCameraHardware();
-        document.getElementById("summarySection").scrollIntoView({ behavior: "smooth" });
+        document.getElementById("compensationSection").scrollIntoView({ behavior: "smooth" });
       }
     });
 
-    // --- 11. PRZEŁĄCZNIKI TRYBÓW ---
     function setScanDirection(dir) {
       scanDirection = dir;
       verifyingPointId = null;
       verifyModeBadge.classList.add("hidden");
-      modeFrontBtn.className = dir === "FRONT" ? "py-2.5 px-2 rounded-lg text-xs font-bold bg-blue-600 text-white transition" : "py-2.5 px-2 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 transition";
-      modeSideBtn.className = dir === "SIDE" ? "py-2.5 px-2 rounded-lg text-xs font-bold bg-blue-600 text-white transition" : "py-2.5 px-2 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 transition";
+
+      const act = "py-2 px-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white transition";
+      const inact = "py-2 px-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 transition";
+      modeFrontBtn.className = dir === "FRONT" ? act : inact;
+      modeSideBtn.className = dir === "SIDE" ? act : inact;
+      modeBackBtn.className = dir === "BACK" ? act : inact;
+
+      const g = SCAN_GUIDES[dir];
+      guideTitle.textContent = g.title;
+      guideDetails.innerHTML = g.html;
+
       if (isCameraRunning) {
-        if (dir === "SIDE") liveKneeHUD.classList.remove("hidden");
-        else liveKneeHUD.classList.add("hidden");
+        if (dir === "SIDE" || dir === "BACK") liveBottomHUD.classList.remove("hidden");
+        else liveBottomHUD.classList.add("hidden");
       }
-      instructionText.innerHTML = dir === "FRONT"
-        ? "<strong>1. Skan z Przodu (Pkt 1–6):</strong> Stań przodem w pełnym kadrze (od stóp do głowy), zrób kilka kroków i wyłącz kamerę."
-        : "<strong>2. Skan z Boku (Pkt 7–10 – Wyprost Kolan & Chód):</strong> Postój 4s bokiem na prostych nogach (ocena APT i wyprostu), a następnie przejdź się bokiem w lewo i w prawo.";
     }
+
     modeFrontBtn.addEventListener("click", () => setScanDirection("FRONT"));
     modeSideBtn.addEventListener("click", () => setScanDirection("SIDE"));
+    modeBackBtn.addEventListener("click", () => setScanDirection("BACK"));
 
     blurToggleBtn.addEventListener("click", () => {
       faceBlurEnabled = !faceBlurEnabled;
@@ -1016,10 +1128,11 @@
       lastAiMarkdownText = "";
       aiResponseBox.classList.add("hidden");
       pointInspectorModal.classList.add("hidden");
+      renderCompensations();
       renderPointsList();
     });
 
-    // --- 12. GEOMETRIA ---
+    // --- 12. GEOMETRIA I DETEKTOR RYTMU KROKÓW ---
     function horizontalTiltDeg(A, B) {
       const dy = Math.abs(A.y - B.y), dx = Math.abs(A.x - B.x);
       return dx < 1 ? 90 : (Math.atan2(dy, dx) * 180) / Math.PI;
@@ -1052,7 +1165,40 @@
       return { rawInternal, effectiveDeg, isHyperExtended };
     }
 
-    // --- 13. PĘTLA GŁÓWNA (Z natychmiastowym zamazywaniem twarzy przed analizą sylwetki) ---
+    // Ocena koślawienia pięty/kostki w widoku z tyłu (medjalne przesunięcie kostki względem osi kolano-pięta)
+    function computeRearHeelPronationDeg(knee, ankle, heel, pelvisCenterX) {
+      const lowerLegLen = Math.hypot(knee.x - heel.x, knee.y - heel.y);
+      if (lowerLegLen < 35) return 0;
+      const ankToHeelDist = Math.hypot(ankle.x - heel.x, ankle.y - heel.y);
+      // Jeśli pięta jest wyraźnie widoczna pod kostką, mierzymy ucieczkę kostki do środka osi ciała
+      const t = Math.max(0.1, Math.min(0.95, (ankle.y - knee.y) / ((heel.y - knee.y) || 1)));
+      const lineX = knee.x + t * (heel.x - knee.x);
+      const ankToCenter = Math.abs(ankle.x - pelvisCenterX);
+      const lineToCenter = Math.abs(lineX - pelvisCenterX);
+      // Dodatnia wartość = kostka zapada się do środka (pronacja/koślawienie pięty)
+      const medialCollapsePx = lineToCenter - ankToCenter;
+      const calcanealRatioDeg = (Math.atan2(medialCollapsePx, Math.max(12, ankToHeelDist * 1.8)) * 180) / Math.PI;
+      return calcanealRatioDeg;
+    }
+
+    // Pomiar czasu trwania kroku lewego i prawego (ms)
+    function trackStepTiming(currentState, nowMs, targetL, targetR) {
+      if (!currentState) return;
+      if (stepTracker.lastState && stepTracker.lastState !== currentState) {
+        const dt = nowMs - stepTracker.lastSwitchMs;
+        if (dt >= 260 && dt <= 1350) {
+          if (currentState === "L") targetL.push(dt);
+          else targetR.push(dt);
+        }
+        stepTracker.lastSwitchMs = nowMs;
+        stepTracker.lastState = currentState;
+      } else if (!stepTracker.lastState) {
+        stepTracker.lastState = currentState;
+        stepTracker.lastSwitchMs = nowMs;
+      }
+    }
+
+    // --- 13. PĘTLA GŁÓWNA ---
     function mainLoop() {
       requestAnimationFrame(mainLoop);
       if (!isCameraRunning || !poseLandmarker || video.readyState < 2 || video.paused || video.ended) return;
@@ -1065,9 +1211,9 @@
         const rem = Math.ceil((autoStopTimestamp - Date.now()) / 1000);
         if (rem <= 0) {
           autoStopTimestamp = 0;
-          speak("Koniec pomiaru. Kamera wyłączona. Sprawdź raport.", true);
+          speak("Koniec pomiaru. Kamera wyłączona. Sprawdź wzorce kompensacji poniżej.", true);
           stopCameraHardware();
-          document.getElementById("summarySection").scrollIntoView({ behavior: "smooth" });
+          document.getElementById("compensationSection").scrollIntoView({ behavior: "smooth" });
           return;
         }
       }
@@ -1079,16 +1225,14 @@
       const isMirrored = isLiveStream && facingMode === "user";
       ctx.clearRect(0, 0, w, h);
 
-      // 1. Wykryj twarze (działa od razu z bliska i średniego dystansu!)
       let faceDetections = [];
-      if (faceBlurEnabled && faceDetector) {
+      if (faceBlurEnabled && faceDetector && scanDirection !== "BACK") {
         try {
           const faceRes = faceDetector.detectForVideo(video, nowMs);
           faceDetections = faceRes.detections || [];
         } catch (_) {}
       }
 
-      // 2. Wykryj sylwetkę
       const result = poseLandmarker.detectForVideo(video, nowMs);
       let pts = null;
       if (result.landmarks && result.landmarks.length > 0) {
@@ -1106,7 +1250,7 @@
       const applyFacePrivacyNow = () => {
         if (!faceBlurEnabled) return;
         const coveredByDetector = drawFaceDetectorShields(ctx, faceDetections, w, isMirrored);
-        if (!coveredByDetector && pts) {
+        if (!coveredByDetector && pts && scanDirection !== "BACK") {
           drawPoseHeadShield(ctx, pts);
         }
       };
@@ -1114,6 +1258,7 @@
       if (!pts) {
         applyFacePrivacyNow();
         consecutiveHumanFrames = 0;
+        stepTracker.lastState = null;
         humanStatusBadge.textContent = faceDetections.length ? "TWARZ ZAMAZANA (COFNIJ SIĘ)" : "BRAK SYLWETKI";
         humanStatusBadge.className = "text-[10px] bg-amber-950 text-amber-400 px-2 py-0.5 rounded border border-amber-800";
         liveBanner.textContent = faceDetections.length
@@ -1127,6 +1272,7 @@
       if (!humanCheck.valid) {
         applyFacePrivacyNow();
         consecutiveHumanFrames = 0;
+        stepTracker.lastState = null;
         humanStatusBadge.textContent = "NIEPEŁNA SYLWETKA";
         humanStatusBadge.className = "text-[10px] bg-amber-950 text-amber-400 px-2 py-0.5 rounded border border-amber-800";
         liveBanner.textContent = `⏳ ${humanCheck.reason}`;
@@ -1144,7 +1290,6 @@
       humanStatusBadge.textContent = "✓ CZŁOWIEK W KADRZE";
       humanStatusBadge.className = "text-[10px] bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-700 font-bold";
 
-      // Rysuj szkielet, a następnie nałóż tarczę prywatności na wierzch
       ctx.save();
       ctx.strokeStyle = "rgba(56, 189, 248, 0.8)";
       ctx.lineWidth = 2.5;
@@ -1160,12 +1305,12 @@
 
       if (isCountingDown) return;
 
-      if (verifyingPointId) processVerificationExerciseFrame(verifyingPointId, pts, w, h);
-      else processStandardScanFrame(pts, w, h);
+      if (verifyingPointId) processVerificationExerciseFrame(verifyingPointId, pts, w, h, nowMs);
+      else processStandardScanFrame(pts, w, h, nowMs);
     }
 
-    // --- 14. SKAN GŁÓWNY 10 PUNKTÓW ---
-    function processStandardScanFrame(pts, w, h) {
+    // --- 14. SKAN GŁÓWNY (PRZÓD / BOK / TYŁ + KOMPENSACJE + RYTM KROKU) ---
+    function processStandardScanFrame(pts, w, h, nowMs) {
       const Nose = pts[0], LEar = pts[7], REar = pts[8];
       const LSh = pts[11], RSh = pts[12], LHip = pts[23], RHip = pts[24];
       const LKnee = pts[25], RKnee = pts[26], LAnk = pts[27], RAnk = pts[28];
@@ -1174,11 +1319,32 @@
       const midSh = { x: (LSh.x + RSh.x) / 2, y: (LSh.y + RSh.y) / 2 };
       const midHip = { x: (LHip.x + RHip.x) / 2, y: (LHip.y + RHip.y) / 2 };
       const torsoLen = Math.max(50, Math.abs(midHip.y - midSh.y));
+      const hipWidth = Math.max(20, Math.abs(LHip.x - RHip.x));
+      const bodyHeightPx = Math.abs(Math.max(LAnk.y, RAnk.y) - Math.min(LEar.y, REar.y)) || 300;
 
       let currentWarnings = [];
 
       if (scanDirection === "FRONT") {
         accum.frontFrames++;
+
+        // Wykrywanie kroków i rytmu z przodu
+        const ankDiffY = LAnk.y - RAnk.y;
+        const stepThreshY = bodyHeightPx * 0.018;
+        const isSteppingFront = Math.abs(ankDiffY) > stepThreshY;
+        if (isSteppingFront) {
+          accum.frontBackStepFrames++;
+          trackStepTiming(ankDiffY > 0 ? "L" : "R", nowMs, accum.stepDurationsL, accum.stepDurationsR);
+
+          // Wykrywanie podciągania biodra (QL Hip Hike): uniesiona stopa + biodro po tej stronie wyżej niż podporowe
+          const liftedIsRight = ankDiffY > 0;
+          const liftedHip = liftedIsRight ? RHip : LHip;
+          const stanceHip = liftedIsRight ? LHip : RHip;
+          const hipHikeDeg = (Math.atan2(stanceHip.y - liftedHip.y, hipWidth) * 180) / Math.PI;
+          if (hipHikeDeg > 4.8) {
+            if (liftedIsRight) accum.compQlHipHikeRightFrames++;
+            else accum.compQlHipHikeLeftFrames++;
+          }
+        }
 
         const headTilt = horizontalTiltDeg(LEar, REar);
         accum.headTiltSum += headTilt;
@@ -1205,22 +1371,29 @@
 
         const pelvicTilt = horizontalTiltDeg(LHip, RHip);
         accum.pelvicTiltSum += pelvicTilt;
+        accum.pelvicSamplesCount++;
         if (pelvicTilt >= 3.4) {
           const dropSide = LHip.y > RHip.y ? "Lewe biodro opada" : "Prawe biodro opada";
           currentWarnings.push(`${dropSide} (${pelvicTilt.toFixed(1)}°)`);
           capturePointErrorSnapshot("P4_PELVIS_FRONT", pelvicTilt, pts, [[LHip, RHip]], [LHip, RHip], dropSide, `${pelvicTilt.toFixed(1)}°`);
         }
 
-        const lVal = Math.abs(kneeValgusDeg(LHip, LKnee, LAnk, midHip.x));
-        const rVal = Math.abs(kneeValgusDeg(RHip, RKnee, RAnk, midHip.x));
-        const maxVal = Math.max(lVal, rVal);
-        const worseKnee = lVal >= rVal ? "Lewe kolano" : "Prawe kolano";
-        accum.kneeValgusMaxSum += maxVal;
+        const lVal = kneeValgusDeg(LHip, LKnee, LAnk, midHip.x);
+        const rVal = kneeValgusDeg(RHip, RKnee, RAnk, midHip.x);
+        const maxAbsVal = Math.max(Math.abs(lVal), Math.abs(rVal));
+        const worseKnee = Math.abs(lVal) >= Math.abs(rVal) ? "Lewe kolano" : "Prawe kolano";
+        accum.kneeValgusMaxSum += maxAbsVal;
         accum.worseKneeSide = worseKnee;
-        if (maxVal >= 6.8) {
-          currentWarnings.push(`Ucieczka osi kolana (${worseKnee}: ${maxVal.toFixed(1)}°)`);
-          const badSegs = lVal >= rVal ? [[LHip, LKnee], [LKnee, LAnk]] : [[RHip, RKnee], [RKnee, RAnk]];
-          capturePointErrorSnapshot("P5_KNEES_FRONT", maxVal, pts, badSegs, [lVal >= rVal ? LKnee : RKnee], `Koślawość (${worseKnee})`, `${maxVal.toFixed(1)}°`);
+        if (maxAbsVal >= 6.8) {
+          currentWarnings.push(`Ucieczka osi kolana (${worseKnee}: ${maxAbsVal.toFixed(1)}°)`);
+          const badSegs = Math.abs(lVal) >= Math.abs(rVal) ? [[LHip, LKnee], [LKnee, LAnk]] : [[RHip, RKnee], [RKnee, RAnk]];
+          capturePointErrorSnapshot("P5_KNEES_FRONT", maxAbsVal, pts, badSegs, [Math.abs(lVal) >= Math.abs(rVal) ? LKnee : RKnee], `Koślawość (${worseKnee})`, `${maxAbsVal.toFixed(1)}°`);
+        }
+
+        // Wykrywanie dominacji przywodzicieli / crossover gait (zwężony rozstaw kostek + koślawość do środka)
+        const ankleSpan = Math.abs(LAnk.x - RAnk.x);
+        if (ankleSpan < hipWidth * 0.48 && (lVal > 5.5 || rVal > 5.5)) {
+          accum.compAdductorCrossoverFrames++;
         }
 
         const legLen = Math.hypot(LHip.y - LAnk.y, LHip.x - LAnk.x) || 200;
@@ -1232,7 +1405,7 @@
           capturePointErrorSnapshot("P6_FEET_ANKLES", footDiff, pts, [[LAnk, LFoot], [RAnk, RFoot]], [LAnk, RAnk], "Asymetria rotacji stóp", `${footDiff.toFixed(1)}%`);
         }
 
-      } else {
+      } else if (scanDirection === "SIDE") {
         accum.sideFrames++;
         const useLeft = (LSh.v + LHip.v + LKnee.v) >= (RSh.v + RHip.v + RKnee.v);
         const Ear = useLeft ? LEar : REar;
@@ -1243,12 +1416,19 @@
         const Foot = useLeft ? LFoot : RFoot;
 
         const facingSign = ((Nose.x - Ear.x) + (Foot.x - Heel.x)) >= 0 ? 1 : -1;
-        const bodyHeightPx = Math.abs(Math.max(LAnk.y, RAnk.y) - Ear.y) || 300;
-        const stepSpreadPct = (Math.abs(LAnk.x - RAnk.x) / bodyHeightPx) * 100;
+        const stepSpreadPx = (LAnk.x - RAnk.x) * facingSign;
+        const stepSpreadPct = (Math.abs(stepSpreadPx) / bodyHeightPx) * 100;
         const isStepping = stepSpreadPct >= 11.5;
 
-        if (isStepping) accum.sideStepFrames++;
-        else accum.sideStandingFrames++;
+        if (isStepping) {
+          accum.sideStepFrames++;
+          // Śledzenie rytmu kroków z boku (L z przodu vs P z przodu)
+          if (Math.abs(stepSpreadPx) > bodyHeightPx * 0.085) {
+            trackStepTiming(stepSpreadPx > 0 ? "L" : "R", nowMs, accum.stepDurationsL, accum.stepDurationsR);
+          }
+        } else {
+          accum.sideStandingFrames++;
+        }
 
         const headForwardDeg = Math.max(0, (Math.atan2((Ear.x - Sh.x) * facingSign, Math.max(1, Math.abs(Sh.y - Ear.y))) * 180) / Math.PI);
         accum.headForwardSum += headForwardDeg;
@@ -1304,7 +1484,7 @@
           currentWarnings.push(`Niedowyprost (${stanceName}: ${stanceKneeData.rawInternal.toFixed(0)}°)`);
           capturePointErrorSnapshot("P9_KNEE_EXTENSION", deficit, pts, [[stanceHip, stanceKnee], [stanceKnee, stanceAnkPt]], [stanceKnee], `Brak pełnego wyprostu (${stanceName})`, `Kąt: ${stanceKneeData.rawInternal.toFixed(1)}° (Norma ≥173°)`);
           if (isStepping) {
-            capturePointErrorSnapshot("P10_GAIT_NORMS", deficit, pts, [[stanceHip, stanceKnee], [stanceKnee, stanceAnkPt]], [stanceKnee], `Chód na ugiętym kolanie (${stanceName})`, `Podpór: ${stanceKneeData.rawInternal.toFixed(1)}° (Norma ≥173°)`);
+            capturePointErrorSnapshot("P10_GAIT_NORMS", deficit, pts, [[stanceHip, stanceKnee], [stanceKnee, stanceAnkPt]], [stanceKnee], `Chód na ugiętym kolanie (${stanceName})`, `Podpór: ${stanceKneeData.rawInternal.toFixed(1)}°`);
           }
         }
 
@@ -1313,6 +1493,13 @@
           const rTrail = (Math.atan2((RHip.x - RKnee.x) * facingSign, Math.max(1, Math.abs(RKnee.y - RHip.y))) * 180) / Math.PI;
           accum.hipTrailSamplesL.push(lTrail);
           accum.hipTrailSamplesR.push(rTrail);
+
+          // KOMPENSACJA: Lędźwia zamiast pośladka (brak zakroku < 9° przy odchyleniu tułowia w tył lub wypchnięciu bioder)
+          const activeTrail = Math.max(lTrail, rTrail);
+          const trunkBackLeanDeg = (Math.atan2((Hip.x - Sh.x) * facingSign, Math.max(1, Math.abs(Hip.y - Sh.y))) * 180) / Math.PI;
+          if (stepSpreadPct > 15 && activeTrail < 9.5 && (trunkBackLeanDeg > 3.2 || aptShiftPct > 4.2)) {
+            accum.compLumbarGaitFrames++;
+          }
         }
 
         const kneeOk = stanceKneeData.rawInternal >= 172.5 && !stanceKneeData.isHyperExtended;
@@ -1324,14 +1511,81 @@
 
         const p95L = getPercentile(accum.kneeExtSamplesL, 0.95);
         const p95R = getPercentile(accum.kneeExtSamplesR, 0.95);
-        liveKneeHUD.innerHTML = `
+        liveBottomHUD.innerHTML = `
           <span><strong>Kolano L:</strong> ${lKneeData.rawInternal.toFixed(0)}° (P95: <strong class="${p95L >= 173 ? 'text-emerald-400' : 'text-red-400'}">${p95L.toFixed(0)}°</strong>)</span>
           <span><strong>Kolano P:</strong> ${rKneeData.rawInternal.toFixed(0)}° (P95: <strong class="${p95R >= 173 ? 'text-emerald-400' : 'text-red-400'}">${p95R.toFixed(0)}°</strong>)</span>
+        `;
+
+      } else if (scanDirection === "BACK") {
+        // --- SKAN 3: WIDOK Z TYŁU (Pięty/Kostki, Opadanie Miednicy, QL Hip Hike, Rytm) ---
+        accum.backFrames++;
+
+        const ankDiffY = LAnk.y - RAnk.y;
+        const isSteppingBack = Math.abs(ankDiffY) > bodyHeightPx * 0.018;
+        if (isSteppingBack) {
+          accum.frontBackStepFrames++;
+          trackStepTiming(ankDiffY > 0 ? "L" : "R", nowMs, accum.stepDurationsL, accum.stepDurationsR);
+
+          const liftedIsRight = ankDiffY > 0;
+          const liftedHip = liftedIsRight ? RHip : LHip;
+          const stanceHip = liftedIsRight ? LHip : RHip;
+          const hipHikeDeg = (Math.atan2(stanceHip.y - liftedHip.y, hipWidth) * 180) / Math.PI;
+          if (hipHikeDeg > 4.8) {
+            if (liftedIsRight) accum.compQlHipHikeRightFrames++;
+            else accum.compQlHipHikeLeftFrames++;
+          }
+        }
+
+        // Poziom miednicy i barków od tyłu (bez zasłaniania przez klatkę/brzuch)
+        const rearPelvicTilt = horizontalTiltDeg(LHip, RHip);
+        accum.rearPelvicTiltSum += rearPelvicTilt;
+        accum.pelvicTiltSum += rearPelvicTilt;
+        accum.pelvicSamplesCount++;
+        if (rearPelvicTilt >= 3.4) {
+          const dropSide = LHip.y > RHip.y ? "Lewe biodro opada (widok z tyłu)" : "Prawe biodro opada (widok z tyłu)";
+          currentWarnings.push(`${dropSide}: ${rearPelvicTilt.toFixed(1)}°`);
+          capturePointErrorSnapshot("P4_PELVIS_FRONT", rearPelvicTilt, pts, [[LHip, RHip]], [LHip, RHip], dropSide, `${rearPelvicTilt.toFixed(1)}°`);
+        }
+
+        const rearShTilt = horizontalTiltDeg(LSh, RSh);
+        accum.rearShTiltSum += rearShTilt;
+
+        // Koślawienie pięt i kostek (Punkt 11)
+        const pronL = (LAnk.v > 0.55 && LHeel.v > 0.5) ? computeRearHeelPronationDeg(LKnee, LAnk, LHeel, midHip.x) : 0;
+        const pronR = (RAnk.v > 0.55 && RHeel.v > 0.5) ? computeRearHeelPronationDeg(RKnee, RAnk, RHeel, midHip.x) : 0;
+        if (LHeel.v > 0.5) accum.rearPronationSamplesL.push(pronL);
+        if (RHeel.v > 0.5) accum.rearPronationSamplesR.push(pronR);
+
+        const maxPron = Math.max(pronL, pronR);
+        const worseFoot = pronL >= pronR ? "Lewa kostka/pięta" : "Prawa kostka/pięta";
+        const pronOk = maxPron < 6.5;
+
+        if (!pronOk) {
+          accum.compRearPronationFrames++;
+          currentWarnings.push(`Koślawienie pięty (${worseFoot}: ${maxPron.toFixed(1)}°)`);
+          const badSegs = pronL >= pronR ? [[LKnee, LAnk], [LAnk, LHeel]] : [[RKnee, RAnk], [RAnk, RHeel]];
+          capturePointErrorSnapshot("P11_REAR_HEELS_BACK", maxPron, pts, badSegs, [pronL >= pronR ? LAnk : RAnk], `Zapadanie kostki do środka (${worseFoot})`, `${maxPron.toFixed(1)}°`);
+        }
+
+        // Rysuj osie łydek i pięt na żywo
+        ctx.save();
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = pronL < 6.5 ? "#10b981" : "#ef4444";
+        ctx.beginPath(); ctx.moveTo(LKnee.x, LKnee.y); ctx.lineTo(LAnk.x, LAnk.y); ctx.lineTo(LHeel.x, LHeel.y); ctx.stroke();
+        ctx.strokeStyle = pronR < 6.5 ? "#10b981" : "#ef4444";
+        ctx.beginPath(); ctx.moveTo(RKnee.x, RKnee.y); ctx.lineTo(RAnk.x, RAnk.y); ctx.lineTo(RHeel.x, RHeel.y); ctx.stroke();
+        ctx.restore();
+
+        liveBottomHUD.innerHTML = `
+          <span><strong>Pięta L:</strong> <strong class="${pronL < 6.5 ? 'text-emerald-400' : 'text-red-400'}">${pronL.toFixed(1)}°</strong></span>
+          <span><strong>Pięta P:</strong> <strong class="${pronR < 6.5 ? 'text-emerald-400' : 'text-red-400'}">${pronR.toFixed(1)}°</strong></span>
+          <span><strong>Kroki:</strong> L:${accum.stepDurationsL.length} / P:${accum.stepDurationsR.length}</span>
         `;
       }
 
       if (currentWarnings.length === 0) {
-        liveBanner.textContent = `✓ SKAN (${scanDirection === "FRONT" ? "PRZÓD" : "BOK"}): Parametry w normie`;
+        const modeTxt = scanDirection === "FRONT" ? "PRZÓD" : (scanDirection === "SIDE" ? "BOK" : "TYŁ");
+        liveBanner.textContent = `✓ SKAN (${modeTxt}): Parametry w normie`;
         liveBanner.className = "absolute top-2 left-2 right-2 p-2 rounded-lg text-center font-bold text-xs bg-emerald-700/90 text-white";
       } else {
         liveBanner.textContent = `⚠️ ${currentWarnings[0]}`;
@@ -1339,8 +1593,9 @@
       }
     }
 
-    // --- 15. FINALIZACJA PODSUMOWANIA ---
+    // --- 15. FINALIZACJA 12 PUNKTÓW ORAZ TŁUMACZ KOMPENSACJI ---
     function finalizeScanSummary() {
+      // Punkty 1–6 (Przód)
       if (accum.frontFrames > 8) {
         const N = accum.frontFrames;
         const avgHead = accum.headTiltSum / N;
@@ -1355,10 +1610,6 @@
         pointsData.P3_TRUNK_SHIFT.status = avgShift >= 3.0 ? "PROBLEM" : "OK";
         pointsData.P3_TRUNK_SHIFT.valueText = `Śr. ${avgShift.toFixed(1)}% (${POINTS_SPEC.P3_TRUNK_SHIFT.normText})`;
 
-        const avgPelv = accum.pelvicTiltSum / N;
-        pointsData.P4_PELVIS_FRONT.status = avgPelv >= 3.2 ? "PROBLEM" : "OK";
-        pointsData.P4_PELVIS_FRONT.valueText = `Śr. ${avgPelv.toFixed(1)}° (${POINTS_SPEC.P4_PELVIS_FRONT.normText})`;
-
         const avgKnee = accum.kneeValgusMaxSum / N;
         pointsData.P5_KNEES_FRONT.status = avgKnee >= 6.5 ? "PROBLEM" : "OK";
         pointsData.P5_KNEES_FRONT.valueText = `Śr. ${avgKnee.toFixed(1)}° (${accum.worseKneeSide}, norma klin. 0–5°)`;
@@ -1368,6 +1619,15 @@
         pointsData.P6_FEET_ANKLES.valueText = `Asymetria L/P: ${avgFoot.toFixed(1)}%`;
       }
 
+      // Punkt 4 (Miednica czołowa - zbierana zarówno z Przodu jak i z Tyłu!)
+      if (accum.pelvicSamplesCount > 8) {
+        const avgPelv = accum.pelvicTiltSum / accum.pelvicSamplesCount;
+        pointsData.P4_PELVIS_FRONT.status = avgPelv >= 3.2 ? "PROBLEM" : "OK";
+        pointsData.P4_PELVIS_FRONT.valueText = `Śr. ${avgPelv.toFixed(1)}° (${POINTS_SPEC.P4_PELVIS_FRONT.normText})`;
+      }
+
+      // Punkty 7–10 (Bok)
+      let extL = 0, extR = 0, lFullOk = true, rFullOk = true, hasHyperL = false, hasHyperR = false;
       if (accum.sideFrames > 8) {
         const N = accum.sideFrames;
         const avgHeadFwd = accum.headForwardSum / N;
@@ -1379,15 +1639,15 @@
           pointsData.P8_PELVIS_APT.status = medApt >= 3.6 ? "PROBLEM" : "OK";
           pointsData.P8_PELVIS_APT.valueText = `Wypchnięcie w staniu: ${medApt.toFixed(1)}% (Norma <3.6%)`;
         } else {
-          pointsData.P8_PELVIS_APT.valueText = "Postój bokiem przez min. 3 sekundy (pomiar APT wyłączony w ruchu)";
+          pointsData.P8_PELVIS_APT.valueText = "Postój bokiem przez min. 3s (pomiar APT aktywny w staniu)";
         }
 
-        const extL = getPercentile(accum.kneeExtSamplesL, 0.95);
-        const extR = getPercentile(accum.kneeExtSamplesR, 0.95);
-        const lFullOk = extL === 0 || extL >= 173.0;
-        const rFullOk = extR === 0 || extR >= 173.0;
-        const hasHyperL = accum.hyperExtSamplesL.length >= 6;
-        const hasHyperR = accum.hyperExtSamplesR.length >= 6;
+        extL = getPercentile(accum.kneeExtSamplesL, 0.95);
+        extR = getPercentile(accum.kneeExtSamplesR, 0.95);
+        lFullOk = extL === 0 || extL >= 173.0;
+        rFullOk = extR === 0 || extR >= 173.0;
+        hasHyperL = accum.hyperExtSamplesL.length >= 6;
+        hasHyperR = accum.hyperExtSamplesR.length >= 6;
         const maxHypL = getPercentile(accum.hyperExtSamplesL, 0.90);
         const maxHypR = getPercentile(accum.hyperExtSamplesR, 0.90);
 
@@ -1416,7 +1676,7 @@
 
         if (accum.sideStepFrames < 8) {
           pointsData.P10_GAIT_NORMS.status = "UNSCANNED";
-          pointsData.P10_GAIT_NORMS.valueText = "Brak kroków bokiem – przejdź się przed kamerą (lub wgraj film z korytarza)";
+          pointsData.P10_GAIT_NORMS.valueText = "Brak kroków bokiem – przejdź się przed kamerą (lub wgraj film)";
         } else {
           const swingFlexL = accum.kneeSwingSamplesL.length ? (180 - getPercentile(accum.kneeSwingSamplesL, 0.05)) : 0;
           const swingFlexR = accum.kneeSwingSamplesR.length ? (180 - getPercentile(accum.kneeSwingSamplesR, 0.05)) : 0;
@@ -1432,7 +1692,7 @@
 
           pointsData.P10_GAIT_NORMS.normsHtml = `
             <div class="flex justify-between border-b border-slate-800 pb-1">
-              <span>1. Wyprost kolana w fazie podporu (Heel Strike):</span>
+              <span>1. Wyprost kolana w fazie podporu:</span>
               <strong class="${norm1_extOk ? 'text-emerald-400' : 'text-red-400'}">L:${extL.toFixed(1)}° | P:${extR.toFixed(1)}° (Norma ≥173°)</strong>
             </div>
             <div class="flex justify-between border-b border-slate-800 pb-1">
@@ -1440,19 +1700,174 @@
               <strong class="${norm2_swingOk ? 'text-emerald-400' : 'text-amber-400'}">L:${swingFlexL.toFixed(0)}° | P:${swingFlexR.toFixed(0)}° (Norma: 45°–65°)</strong>
             </div>
             <div class="flex justify-between">
-              <span>3. Wyprost biodra w zakroku (Terminal Stance):</span>
+              <span>3. Wyprost biodra w zakroku:</span>
               <strong class="${norm3_trailOk ? 'text-emerald-400' : 'text-red-400'}">L:${trailL.toFixed(1)}° | P:${trailR.toFixed(1)}° (Norma ≥10°)</strong>
             </div>
           `;
         }
       }
 
+      // Punkt 11: Koślawienie pięt i kostek (Tył)
+      if (accum.backFrames > 8) {
+        const p85L = getPercentile(accum.rearPronationSamplesL, 0.85);
+        const p85R = getPercentile(accum.rearPronationSamplesR, 0.85);
+        const pronOk = p85L < 6.5 && p85R < 6.5;
+        pointsData.P11_REAR_HEELS_BACK.status = pronOk ? "OK" : "PROBLEM";
+        pointsData.P11_REAR_HEELS_BACK.valueText = `Koślawienie (P85): L=${p85L.toFixed(1)}° | P=${p85R.toFixed(1)}° (Norma <6.5°)`;
+        pointsData.P11_REAR_HEELS_BACK.normsHtml = `
+          <div class="flex justify-between border-b border-slate-800 pb-1">
+            <span>Zapadanie Lewej kostki/pięty do środka:</span>
+            <strong class="${p85L < 6.5 ? 'text-emerald-400' : 'text-red-400'}">${p85L.toFixed(1)}° (Norma <6.5°)</strong>
+          </div>
+          <div class="flex justify-between">
+            <span>Zapadanie Prawej kostki/pięty do środka:</span>
+            <strong class="${p85R < 6.5 ? 'text-emerald-400' : 'text-red-400'}">${p85R.toFixed(1)}° (Norma <6.5°)</strong>
+          </div>
+        `;
+      }
+
+      // Punkt 12: Symetria czasu kroku (Rytm L vs P)
+      let stepAsymPct = 0;
+      let hasStepSymmetryData = accum.stepDurationsL.length >= 2 && accum.stepDurationsR.length >= 2;
+      if (hasStepSymmetryData) {
+        const medL = getPercentile(accum.stepDurationsL, 0.5);
+        const medR = getPercentile(accum.stepDurationsR, 0.5);
+        const avgBoth = (medL + medR) / 2;
+        stepAsymPct = avgBoth > 0 ? (Math.abs(medL - medR) / avgBoth) * 100 : 0;
+        const symOk = stepAsymPct < 8.0;
+        const shorterSide = medL < medR ? "Lewa noga (krótszy krok)" : "Prawa noga (krótszy krok)";
+
+        pointsData.P12_STEP_SYMMETRY.status = symOk ? "OK" : "PROBLEM";
+        pointsData.P12_STEP_SYMMETRY.valueText = `Asymetria rytmu: ${stepAsymPct.toFixed(1)}% (L=${Math.round(medL)}ms vs P=${Math.round(medR)}ms)`;
+        pointsData.P12_STEP_SYMMETRY.normsHtml = `
+          <div class="flex justify-between border-b border-slate-800 pb-1">
+            <span>Mediana czasu kroku Lewego (${accum.stepDurationsL.length} kr.):</span>
+            <strong class="text-sky-300">${Math.round(medL)} ms</strong>
+          </div>
+          <div class="flex justify-between border-b border-slate-800 pb-1">
+            <span>Mediana czasu kroku Prawego (${accum.stepDurationsR.length} kr.):</span>
+            <strong class="text-sky-300">${Math.round(medR)} ms</strong>
+          </div>
+          <div class="flex justify-between">
+            <span>Wskaźnik asymetrii rytmu (Norma < 8%):</span>
+            <strong class="${symOk ? 'text-emerald-400' : 'text-red-400'}">${stepAsymPct.toFixed(1)}% (${symOk ? 'Równy rytm' : shorterSide})</strong>
+          </div>
+        `;
+      } else if (accum.sideFrames > 8 || accum.frontFrames > 8 || accum.backFrames > 8) {
+        pointsData.P12_STEP_SYMMETRY.valueText = `Zbyt mało kroków (L:${accum.stepDurationsL.length}, P:${accum.stepDurationsR.length}) – zrób min. 4 kroki w marszu`;
+      }
+
+      // --- BUDOWANIE WNIOSKÓW TŁUMACZA KOMPENSACJI ---
+      detectedCompensations = [];
+
+      if (accum.sideStepFrames >= 6 && accum.compLumbarGaitFrames >= 4) {
+        const pct = Math.min(100, Math.round((accum.compLumbarGaitFrames / accum.sideStepFrames) * 100));
+        detectedCompensations.push({
+          title: "Krok wygląda na ciągnięty z lędźwi zamiast z pośladka",
+          severity: "high",
+          badge: `${pct}% klatek kroku`,
+          detail: "W fazie zakroku Twoje udo nie otwiera się swobodnie za biodro (<10°), a dokładnie w tym samym momencie tułów odchyla się w tył lub miednica ucieka w przód. Typowa kompensacja przy przodopochyleniu miednicy: prostowniki lędźwi przejmują robotę uśpionego pośladka wielkiego.",
+          actionPoint: "P8_PELVIS_APT"
+        });
+      }
+
+      if (accum.frontFrames >= 10 && accum.compAdductorCrossoverFrames >= 5) {
+        const pct = Math.min(100, Math.round((accum.compAdductorCrossoverFrames / accum.frontFrames) * 100));
+        detectedCompensations.push({
+          title: "Podejrzenie dominacji przywodzicieli / słabego pośladka średniego",
+          severity: "high",
+          badge: `${pct}% klatek przodu`,
+          detail: "Twoje stopy stawiają się zbyt blisko linii środka ciała (zwężony krok / crossover), a kolana uciekają do wewnątrz. Wygląda to jakby napięte przywodziciele ściągały nogę do środka przy braku kontry z pośladka średniego.",
+          actionPoint: "P5_KNEES_FRONT"
+        });
+      }
+
+      const totalQlHike = accum.compQlHipHikeLeftFrames + accum.compQlHipHikeRightFrames;
+      if (accum.frontBackStepFrames >= 6 && totalQlHike >= 4) {
+        const side = accum.compQlHipHikeLeftFrames >= accum.compQlHipHikeRightFrames ? "po LEWEJ stronie" : "po PRAWEJ stronie";
+        detectedCompensations.push({
+          title: `Podciąganie biodra mięśniem czworobocznym lędźwi (Hip Hike ${side})`,
+          severity: "medium",
+          badge: `${totalQlHike} kl.`,
+          detail: `Podczas przenoszenia nogi biodro ${side} podskakuje w górę do żeber zamiast utrzymać poziom. To sygnał, że mięsień QL wyręcza osłabiony pośladek średni lub zginacz biodra.`,
+          actionPoint: "P4_PELVIS_FRONT"
+        });
+      }
+
+      if (accum.sideFrames >= 10 && (hasHyperL || hasHyperR || !lFullOk || !rFullOk)) {
+        const isHyp = hasHyperL || hasHyperR;
+        detectedCompensations.push({
+          title: isHyp ? "Ryglowanie kolan w przeproście (Kompensacja APT)" : "Chód / stanie na niedoprostowanych kolanach",
+          severity: "high",
+          badge: isHyp ? "Przeprost >184°" : `P95: ${Math.min(extL || 180, extR || 180).toFixed(0)}°`,
+          detail: isHyp
+            ? "Zamiast trzymać postawę pośladkiem i brzuchem, blokujesz kolana do tyłu (genu recurvatum), aby zrównoważyć wypchniętą w przód miednicę."
+            : "Kolana nie osiągają stabilnego pełnego wyprostu (≥173°). Często wynika to z przykurczu kulszowo-goleniowych / łydki lub słabej pracy głowy przyśrodkowej czworogłowego (VMO).",
+          actionPoint: "P9_KNEE_EXTENSION"
+        });
+      }
+
+      if (accum.backFrames >= 10 && accum.compRearPronationFrames >= 5) {
+        const pct = Math.min(100, Math.round((accum.compRearPronationFrames / accum.backFrames) * 100));
+        detectedCompensations.push({
+          title: "Zapadanie kostki i koślawienie pięty do środka (Widok z tyłu)",
+          severity: "medium",
+          badge: `${pct}% klatek tyłu`,
+          detail: "Od tyłu widać ucieczkę kostki do środka względem osi kolano–pięta. Może to oznaczać niewydolność mięśnia piszczelowego tylnego i rozciągać cały łańcuch aż do kolana i biodra.",
+          actionPoint: "P11_REAR_HEELS_BACK"
+        });
+      }
+
+      if (hasStepSymmetryData && stepAsymPct >= 8.0) {
+        detectedCompensations.push({
+          title: `Asymetria rytmu chodu / mikro-utykanie (${stepAsymPct.toFixed(1)}%)`,
+          severity: "medium",
+          badge: "Rytm L vs P",
+          detail: "Czas podparcia na lewej i prawej nodze wyraźnie się różni. Nawet jeśli wizualnie idziesz prosto, Twój układ nerwowy podświadomie odciąża jedną stronę.",
+          actionPoint: "P12_STEP_SYMMETRY"
+        });
+      }
+
+      renderCompensations();
       renderPointsList();
       if (selectedInspectorPointId) openPointInspector(selectedInspectorPointId);
     }
 
-    // --- 16. TESTY WERYFIKACYJNE ---
-    function processVerificationExerciseFrame(pointId, pts, w, h) {
+    function renderCompensations() {
+      const hasAnyScan = accum.frontFrames > 8 || accum.sideFrames > 8 || accum.backFrames > 8;
+      compCountBadge.textContent = `${detectedCompensations.length} wzorców`;
+
+      if (!hasAnyScan) {
+        compensationList.innerHTML = `<p class="text-slate-400 italic">Wykonaj Skan z Przodu, z Boku lub z Tyłu (stanie + kilka kroków), aby system przeanalizował kompensacje mięśniowe.</p>`;
+        return;
+      }
+
+      if (detectedCompensations.length === 0) {
+        compensationList.innerHTML = `<div class="p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-700/50 text-emerald-300">✓ W zeskanowanych płaszczyznach nie wykryto złożonych wzorców kompensacyjnych (lędźwia, przywodziciele, QL, przeprost).</div>`;
+        return;
+      }
+
+      compensationList.innerHTML = detectedCompensations.map(c => {
+        const border = c.severity === "high" ? "border-red-500/70 bg-red-950/20" : "border-amber-500/60 bg-amber-950/20";
+        return `
+          <div class="p-3 rounded-xl border ${border} space-y-1.5">
+            <div class="flex justify-between items-start gap-2">
+              <div class="font-bold text-white text-xs">⚠️ ${c.title}</div>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-900 text-amber-300 border border-slate-700 font-bold shrink-0">${c.badge}</span>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed">${c.detail}</p>
+            <div class="pt-0.5 flex justify-end">
+              <button onclick="window.selectPointCard('${c.actionPoint}')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 px-2.5 py-1 rounded font-semibold">
+                Zobacz zrzut & Test potwierdzający →
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // --- 16. TESTY WERYFIKACYJNE (WSZYSTKIE 12 PUNKTÓW) ---
+    function processVerificationExerciseFrame(pointId, pts, w, h, nowMs) {
       const Nose = pts[0], LEar = pts[7], REar = pts[8];
       const LSh = pts[11], RSh = pts[12], LElb = pts[13], RElb = pts[14];
       const LHip = pts[23], RHip = pts[24], LKnee = pts[25], RKnee = pts[26];
@@ -1460,6 +1875,7 @@
 
       const midSh = { x: (LSh.x + RSh.x) / 2, y: (LSh.y + RSh.y) / 2 };
       const midHip = { x: (LHip.x + RHip.x) / 2, y: (LHip.y + RHip.y) / 2 };
+      const bodyHeightPx = Math.abs(Math.max(LAnk.y, RAnk.y) - Math.min(LEar.y, REar.y)) || 300;
 
       const useLeft = (LSh.v + LHip.v + LKnee.v) >= (RSh.v + RHip.v + RKnee.v);
       const Ear = useLeft ? LEar : REar, Sh = useLeft ? LSh : RSh, Hip = useLeft ? LHip : RHip;
@@ -1467,13 +1883,26 @@
       const Heel = useLeft ? LHeel : RHeel, Foot = useLeft ? LFoot : RFoot;
       const facingSign = ((Nose.x - Ear.x) + (Foot.x - Heel.x)) >= 0 ? 1 : -1;
 
-      let displayVal = 0;
+      let displayTxt = "";
 
       if (pointId === "P9_KNEE_EXTENSION" || pointId === "P10_GAIT_NORMS") {
         const kData = computeSagittalKneeAngle(Hip, Knee, Ank, facingSign);
         verifyBuffer.main.push(kData.rawInternal);
         if (kData.effectiveDeg > 184.2) verifyBuffer.hyperCount++;
-        displayVal = kData.rawInternal;
+        displayTxt = `${kData.rawInternal.toFixed(1)}°`;
+      } else if (pointId === "P11_REAR_HEELS_BACK") {
+        const pL = computeRearHeelPronationDeg(LKnee, LAnk, LHeel, midHip.x);
+        const pR = computeRearHeelPronationDeg(RKnee, RAnk, RHeel, midHip.x);
+        const mx = Math.max(pL, pR);
+        verifyBuffer.main.push(mx);
+        displayTxt = `Pronacja: ${mx.toFixed(1)}°`;
+      } else if (pointId === "P12_STEP_SYMMETRY") {
+        const spreadX = (LAnk.x - RAnk.x) * facingSign;
+        if (Math.abs(spreadX) > bodyHeightPx * 0.085) {
+          trackStepTiming(spreadX > 0 ? "L" : "R", nowMs, verifyBuffer.stepsL, verifyBuffer.stepsR);
+        }
+        verifyBuffer.main.push(Math.abs(spreadX));
+        displayTxt = `Kroki L:${verifyBuffer.stepsL.length} / P:${verifyBuffer.stepsR.length}`;
       } else if (pointId === "P8_PELVIS_APT") {
         const isLeftTrailing = ((LAnk.x - RAnk.x) * facingSign) < 0;
         const tHip = isLeftTrailing ? LHip : RHip, tKnee = isLeftTrailing ? LKnee : RKnee;
@@ -1481,29 +1910,29 @@
         const trunkFwd = verticalTiltDeg(Hip, Sh);
         verifyBuffer.main.push(trailDeg);
         verifyBuffer.aux.push(trunkFwd);
-        displayVal = trailDeg;
+        displayTxt = `Zakrok: ${trailDeg.toFixed(1)}°`;
       } else if (pointId === "P7_HEAD_FORWARD") {
         const headFwd = Math.max(0, (Math.atan2((Ear.x - Sh.x) * facingSign, Math.max(1, Math.abs(Sh.y - Ear.y))) * 180) / Math.PI);
         verifyBuffer.main.push(headFwd);
-        displayVal = headFwd;
+        displayTxt = `${headFwd.toFixed(1)}°`;
       } else if (pointId === "P6_FEET_ANKLES") {
         const dorsi = Math.max(verticalTiltDeg(LAnk, LKnee), verticalTiltDeg(RAnk, RKnee));
         verifyBuffer.main.push(dorsi);
-        displayVal = dorsi;
+        displayTxt = `Piszczel: ${dorsi.toFixed(1)}°`;
       } else if (pointId === "P1_HEAD_TILT") {
-        displayVal = horizontalTiltDeg(LEar, REar); verifyBuffer.main.push(displayVal);
+        const v = horizontalTiltDeg(LEar, REar); verifyBuffer.main.push(v); displayTxt = `${v.toFixed(1)}°`;
       } else if (pointId === "P2_SHOULDERS") {
-        displayVal = Math.abs(angleABC(LHip, LSh, LElb) - angleABC(RHip, RSh, RElb)); verifyBuffer.main.push(displayVal);
+        const v = Math.abs(angleABC(LHip, LSh, LElb) - angleABC(RHip, RSh, RElb)); verifyBuffer.main.push(v); displayTxt = `Różnica: ${v.toFixed(1)}°`;
       } else if (pointId === "P3_TRUNK_SHIFT") {
-        displayVal = verticalTiltDeg(midHip, midSh); verifyBuffer.main.push(displayVal);
+        const v = verticalTiltDeg(midHip, midSh); verifyBuffer.main.push(v); displayTxt = `${v.toFixed(1)}°`;
       } else if (pointId === "P4_PELVIS_FRONT") {
-        displayVal = horizontalTiltDeg(LHip, RHip); verifyBuffer.main.push(displayVal);
+        const v = horizontalTiltDeg(LHip, RHip); verifyBuffer.main.push(v); displayTxt = `${v.toFixed(1)}°`;
       } else if (pointId === "P5_KNEES_FRONT") {
-        displayVal = Math.max(Math.abs(kneeValgusDeg(LHip, LKnee, LAnk, midHip.x)), Math.abs(kneeValgusDeg(RHip, RKnee, RAnk, midHip.x)));
-        verifyBuffer.main.push(displayVal);
+        const v = Math.max(Math.abs(kneeValgusDeg(LHip, LKnee, LAnk, midHip.x)), Math.abs(kneeValgusDeg(RHip, RKnee, RAnk, midHip.x)));
+        verifyBuffer.main.push(v); displayTxt = `${v.toFixed(1)}°`;
       }
 
-      liveBanner.textContent = `🎯 TEST (${POINTS_SPEC[pointId].name}): Pomiar = ${displayVal.toFixed(1)}°`;
+      liveBanner.textContent = `🎯 TEST (${POINTS_SPEC[pointId].name}): ${displayTxt}`;
       liveBanner.className = "absolute top-2 left-2 right-2 p-2 rounded-lg text-center font-bold text-xs bg-amber-600 text-white shadow";
     }
 
@@ -1519,30 +1948,47 @@
       }
 
       const p95 = getPercentile(verifyBuffer.main, 0.95);
+      const p85 = getPercentile(verifyBuffer.main, 0.85);
       const med = getPercentile(verifyBuffer.main, 0.50);
       let confirmed = false;
       let msg = "";
 
-      if (pointId === "P9_KNEE_EXTENSION" || pointId === "P10_GAIT_NORMS") {
+      if (pointId === "P12_STEP_SYMMETRY") {
+        if (verifyBuffer.stepsL.length < 2 || verifyBuffer.stepsR.length < 2) {
+          pData.verifyResultText = "Zbyt mało kroków w kadrze (potrzebne min. 2 pełne kroki na każdą nogę).";
+          verifyingPointId = null; openPointInspector(pointId); return;
+        }
+        const mL = getPercentile(verifyBuffer.stepsL, 0.5), mR = getPercentile(verifyBuffer.stepsR, 0.5);
+        const asym = (Math.abs(mL - mR) / ((mL + mR) / 2)) * 100;
+        confirmed = asym >= 8.0;
+        msg = confirmed
+          ? `✓ POTWIERDZONO ASYMETRIĘ RYTMU (${asym.toFixed(1)}%): Nawet przy świadomej kontroli kroki różnią się czasem (L=${Math.round(mL)}ms vs P=${Math.round(mR)}ms).`
+          : `✗ WYKLUCZONO UTRWALONE UTYKANIE: Przy świadomej kontroli rytm wyrównał się (${asym.toFixed(1)}%).`;
+      } else if (pointId === "P11_REAR_HEELS_BACK") {
+        confirmed = p85 >= 6.5;
+        msg = confirmed
+          ? `✓ POTWIERDZONO KOŚLAWIENIE PIĘT W RUCHU (P85: ${p85.toFixed(1)}°): Podczas wspięć na palce kostki nadal zapadają się do środka – słaba aktywacja piszczelowego tylnego.`
+          : `✗ WYKLUCZONO NIEWYDOLNOŚĆ ŁUKU: Podczas wspięć na palce pięty ładnie ustawiły się w osi (${p85.toFixed(1)}°).`;
+      } else if (pointId === "P9_KNEE_EXTENSION" || pointId === "P10_GAIT_NORMS") {
         if (verifyBuffer.hyperCount >= 8) {
           confirmed = true;
-          msg = `✓ POTWIERDZONO PRZEPROST KOLANA (Genu Recurvatum): Podczas próby prostowania kolano rygluje się za osią (${verifyBuffer.hyperCount} kl.). Wymagana kontrola ekscentryczna dwugłowego uda.`;
+          msg = `✓ POTWIERDZONO PRZEPROST KOLANA: Kolano rygluje się za osią (${verifyBuffer.hyperCount} kl.).`;
         } else if (p95 < 173.5) {
           confirmed = true;
-          msg = `✓ POTWIERDZONO DEFICYT WYPROSTU: Utrzymany wyprost (95. perc.) wyniósł tylko ${p95.toFixed(1)}° (brakuje ${(176 - p95).toFixed(1)}°). Przykurcz kulszowo-goleniowych / łydki lub słabe VMO.`;
+          msg = `✓ POTWIERDZONO DEFICYT WYPROSTU: Utrzymany wyprost (P95) to tylko ${p95.toFixed(1)}° (brakuje ${(176 - p95).toFixed(1)}°).`;
         } else {
           confirmed = false;
-          msg = `✗ WYKLUCZONO BLOKADĘ STAWOWĄ: Świadomy doprost osiągnął ${p95.toFixed(1)}° (w normie 174°–180°). Ugięte kolana podczas chodu to nawyk/kompensacja, a nie sztywny przykurcz.`;
+          msg = `✗ WYKLUCZONO BLOKADĘ STAWOWĄ: Świadomy doprost osiągnął ${p95.toFixed(1)}° (w normie 174°–180°).`;
         }
       } else if (pointId === "P8_PELVIS_APT") {
         const trunkP90 = getPercentile(verifyBuffer.aux, 0.90);
         confirmed = p95 < 12.0 || trunkP90 > 12.0;
         msg = confirmed
-          ? `✓ POTWIERDZONO PRZYKURCZ BIODROWO-LĘDŹWIOWY: Zakrok uda w wykroku to tylko ${p95.toFixed(1)}° (norma >12°), pochylenie tułowia ${trunkP90.toFixed(1)}°.`
-          : `✗ WYKLUCZONO SZTYWNY PRZYKURCZ: Zakrok biodra ${p95.toFixed(1)}° przy pionowym tułowiu (${trunkP90.toFixed(1)}°). Przodopochylenie wynika głównie ze słabej aktywacji brzucha i pośladków.`;
+          ? `✓ POTWIERDZONO PRZYKURCZ BIODRA: Zakrok w wykroku to ${p95.toFixed(1)}° (norma >12°), pochylenie tułowia ${trunkP90.toFixed(1)}°.`
+          : `✗ WYKLUCZONO SZTYWNY PRZYKURCZ: Zakrok ${p95.toFixed(1)}° przy pionowym tułowiu (${trunkP90.toFixed(1)}°).`;
       } else if (pointId === "P7_HEAD_FORWARD") {
         confirmed = med >= 13.5;
-        msg = confirmed ? `✓ POTWIERDZONO: Mediana wysunięcia głowy w teście to ${med.toFixed(1)}°.` : `✗ WYKLUCZONO SZTYWNĄ BLOKADĘ: W ćwiczeniu utrzymujesz głowę w osi (${med.toFixed(1)}°).`;
+        msg = confirmed ? `✓ POTWIERDZONO: Mediana wysunięcia głowy w teście to ${med.toFixed(1)}°.` : `✗ WYKLUCZONO SZTYWNĄ BLOKADĘ: W ćwiczeniu głowa wraca w oś (${med.toFixed(1)}°).`;
       } else if (pointId === "P6_FEET_ANKLES") {
         confirmed = p95 < 29.0;
         msg = confirmed ? `✓ POTWIERDZONO SZTYWNĄ KOSTKĘ: Max kąt piszczeli (P95) to ${p95.toFixed(1)}° (norma >30°).` : `✗ WYKLUCZONO: Dobra mobilność kostki (${p95.toFixed(1)}°).`;
@@ -1559,7 +2005,7 @@
       openPointInspector(pointId);
     }
 
-    // --- 17. RENDEROWANIE LISTY 10 PUNKTÓW I INSPEKTORA ---
+    // --- 17. RENDEROWANIE 12 PUNKTÓW I INSPEKTORA ---
     function renderPointsList() {
       pointsListContainer.innerHTML = Object.keys(POINTS_SPEC).map(id => {
         const spec = POINTS_SPEC[id], data = pointsData[id];
@@ -1600,6 +2046,7 @@
       inspPointTitle.textContent = spec.name;
       inspPointValue.textContent = data.valueText;
 
+      const viewPl = spec.scanView === "FRONT" ? "PRZODU" : (spec.scanView === "SIDE" ? "BOKU" : "TYŁU");
       if (data.status === "PROBLEM") {
         inspPointBadge.textContent = "⚠️ NIE OK (ODCHYŁKA OD NORMY)";
         inspPointBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-600";
@@ -1607,7 +2054,7 @@
         inspPointBadge.textContent = "✓ OK (ZGODNE Z NORMĄ)";
         inspPointBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-600";
       } else {
-        inspPointBadge.textContent = `NIEZBADANE (SKAN Z ${spec.scanView === "FRONT" ? "PRZODU" : "BOKU"})`;
+        inspPointBadge.textContent = `NIEZBADANE (SKAN Z ${viewPl})`;
         inspPointBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400";
       }
 
@@ -1663,19 +2110,27 @@
       const testView = (selectedInspectorPointId === "P6_FEET_ANKLES") ? "SIDE" : spec.scanView;
       setScanDirection(testView);
       verifyingPointId = selectedInspectorPointId;
-      verifyBuffer = { main: [], aux: [], hyperCount: 0 };
+      verifyBuffer = { main: [], aux: [], hyperCount: 0, stepsL: [], stepsR: [] };
 
       verifyModeBadge.classList.remove("hidden");
-      instructionText.innerHTML = `<strong class="text-amber-400">TEST (${spec.name}):</strong> ${spec.testDesc}`;
+      guideTitle.textContent = `🎯 TEST WERYFIKACYJNY: ${spec.name}`;
+      guideDetails.innerHTML = `<div class="text-amber-200 font-medium">${spec.testDesc}</div>`;
 
       window.scrollTo({ top: 0, behavior: "smooth" });
       await startCameraHardware();
       autoScanBtn.click();
     });
 
-    // --- 18. RAPORT TEKSTOWY, KONSULTANT GEMINI AI I EKSPORT PDF ---
+    // --- 18. RAPORT, PDF I GEMINI AI ---
     function buildFullTextReport() {
-      const lines = ["=== RAPORT BIOMECHANICZNY v9.1 (10 PUNKTÓW + NORMY CHODU) ==="];
+      const lines = ["=== RAPORT BIOMECHANICZNY v10.0 (12 PUNKTÓW + TŁUMACZ KOMPENSACJI) ==="];
+      if (detectedCompensations.length > 0) {
+        lines.push("--- WYKRYTE WZORCE KOMPENSACJI ---");
+        for (const c of detectedCompensations) {
+          lines.push(`* ${c.title} (${c.badge}): ${c.detail}`);
+        }
+      }
+      lines.push("--- POMIARY 12 PUNKTÓW ---");
       for (const id of Object.keys(POINTS_SPEC)) {
         const s = POINTS_SPEC[id], d = pointsData[id];
         lines.push(`${s.name}: [${d.status}] ${d.valueText}${d.verifyResultText ? " | Test: " + d.verifyResultText : ""}`);
@@ -1693,6 +2148,13 @@
     });
 
     exportPdfBtn.addEventListener("click", () => {
+      const compHtml = detectedCompensations.map(c => `
+        <div class="print-card" style="border-left:4px solid #dc2626;">
+          <div style="font-weight:700;font-size:13px;">⚠️ ${c.title} (${c.badge})</div>
+          <div style="font-size:11px;color:#334155;margin-top:3px;">${c.detail}</div>
+        </div>
+      `).join("");
+
       const cardsHtml = Object.keys(POINTS_SPEC).map(id => {
         const s = POINTS_SPEC[id], d = pointsData[id];
         if (d.status === "UNSCANNED") return "";
@@ -1708,8 +2170,10 @@
       }).join("");
 
       printReportView.innerHTML = `
-        <h1 style="font-size:18px;font-weight:800;margin-bottom:4px;">Raport Biomechaniczny Postawy i Chodu v9.1</h1>
+        <h1 style="font-size:18px;font-weight:800;margin-bottom:4px;">Raport Biomechaniczny Postawy i Chodu v10.0</h1>
         <p style="font-size:11px;color:#475569;margin-bottom:12px;">Wygenerowano: ${new Date().toLocaleString("pl-PL")} | Twarze na zdjęciach zostały trwale zamazane.</p>
+        ${compHtml ? `<h2 style="font-size:14px;font-weight:700;margin:8px 0;">Wykryte wzorce kompensacji</h2>${compHtml}` : ""}
+        <h2 style="font-size:14px;font-weight:700;margin:8px 0;">Szczegóły 12 punktów</h2>
         ${cardsHtml || "<p>Brak zeskanowanych punktów.</p>"}
         ${lastAiMarkdownText ? `<div class="print-card"><h3>Analiza Gemini AI</h3><div style="font-size:12px;white-space:pre-wrap;">${lastAiMarkdownText}</div></div>` : ""}
       `;
@@ -1727,17 +2191,17 @@
       }
 
       aiResponseBox.classList.remove("hidden");
-      aiResponseBox.innerHTML = `<div class="text-sky-400 animate-pulse font-semibold">Wysyłam raport 10 punktów oraz zamazane zdjęcia błędów do Gemini 2.5 Flash...</div>`;
+      aiResponseBox.innerHTML = `<div class="text-sky-400 animate-pulse font-semibold">Wysyłam raport 12 punktów, wzorce kompensacji oraz zdjęcia błędów do Gemini 2.5 Flash...</div>`;
       runAiAnalysisBtn.disabled = true;
 
-      const promptText = `Jesteś krytycznym, precyzyjnym fizjoterapeutą sportowym i biomechanikiem. Przeanalizuj poniższy raport z 10 punktów kontrolnych (w tym 95. percentyl wyprostu kolan i normy chodu) oraz załączone zrzuty błędów (twarz pacjenta jest celowo zamazana dla prywatności):
+      const promptText = `Jesteś krytycznym, precyzyjnym fizjoterapeutą sportowym i biomechanikiem. Przeanalizuj poniższy raport z 12 punktów kontrolnych (Przód, Bok, Tył, 95. percentyl wyprostu kolan, koślawienie pięt, rytm kroków L vs P oraz wykryte kompensacje) wraz ze zdjęciami błędów (twarz jest celowo zamazana):
 
 ${buildFullTextReport()}
 
-Odpowiedz konkretnie po polsku w 4 punktach (bez lania wody):
-1. ŁAŃCUCH PRZYCZYNOWO-SKUTKOWY: Jak łączą się wykryte problemy (np. miednica APT, wyprost/przeprost kolan, asymetria barków/głowy)? Co jest przyczyną pierwotną, a co kompensacją?
-2. ANALIZA WYPROSTU KOLAN I CHODU: Oceń zgodność z normami klinicznymi i wskaż ewentualne braki w testach potwierdzających.
-3. PLAN KOREKCYJNY NA TYDZIEŃ: Konkretne ćwiczenia z rozróżnieniem na stronę lewą i prawą oraz uwagą techniczną jak nie oszukiwać ciałem.
+Odpowiedz konkretnie po polsku w 4 punktach (bez lania wody i bez nieuzasadnionego chwalenia):
+1. ŁAŃCUCH PRZYCZYNOWO-SKUTKOWY I KOMPENSACJE: Które mięśnie prawdopodobnie są nadaktywne/przykurczone (np. lędźwia, przywodziciele, QL, zginacze biodra), a które nieaktywne (pośladek wielki/średni, VMO, piszczelowy tylny)? Co jest pierwotną przyczyną, a co skutkiem?
+2. OCENA CHODU, KOLAN I STÓP: Zestaw wyprost/przeprost kolan, ustawienie pięt od tyłu i rytm kroków z normami. Jeśli brakuje skanu którejś płaszczyzny lub testu potwierdzającego, wskaż to wprost.
+3. PLAN NAPRAWCZY (4 kroki: rozluźnij -> rozciągnij -> aktywuj -> zintegruj): Konkretne ćwiczenia z rozróżnieniem na stronę lewą i prawą oraz uwagą, jak nie kompensować lędźwiami.
 4. JEDNA WSKAZÓWKA DO CHODU NA CO DZIEŃ.`;
 
       const parts = [{ text: promptText }];
